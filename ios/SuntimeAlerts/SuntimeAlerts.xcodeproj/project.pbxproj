@@ -1,0 +1,916 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B068633E2ED91BEB00C40CEA /* SuntimeAlertsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068633D2ED91BEB00C40CEA /* SuntimeAlertsApp.swift */; };
+		B06863402ED91BEB00C40CEA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068633F2ED91BEB00C40CEA /* ContentView.swift */; };
+		B06863422ED91BED00C40CEA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B06863412ED91BED00C40CEA /* Assets.xcassets */; };
+		B06863452ED91BED00C40CEA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B06863442ED91BED00C40CEA /* Preview Assets.xcassets */; };
+		B068634F2ED91BEE00C40CEA /* SuntimeAlertsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068634E2ED91BEE00C40CEA /* SuntimeAlertsTests.swift */; };
+		B06863592ED91BEE00C40CEA /* SuntimeAlertsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863582ED91BEE00C40CEA /* SuntimeAlertsUITests.swift */; };
+		B068635B2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068635A2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift */; };
+		B06863652ED91D3D00C40CEA /* SunScheduleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863262ED91AF000C40CEA /* SunScheduleService.swift */; };
+		B06863662ED91D3D00C40CEA /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863272ED91AF000C40CEA /* LocationService.swift */; };
+		B06863672ED91D3D00C40CEA /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863282ED91AF000C40CEA /* SettingsStore.swift */; };
+		B06863682ED91D4D00C40CEA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863332ED91AF000C40CEA /* Models.swift */; };
+		B06863692ED91D5100C40CEA /* SunTimesCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863352ED91AF000C40CEA /* SunTimesCalculator.swift */; };
+		B068636A2ED91D5700C40CEA /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632C2ED91AF000C40CEA /* SettingsViewModel.swift */; };
+		B068636B2ED91D5700C40CEA /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632B2ED91AF000C40CEA /* HomeViewModel.swift */; };
+		B068636C2ED91D5B00C40CEA /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632E2ED91AF000C40CEA /* RootView.swift */; };
+		B068636D2ED91D5F00C40CEA /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863242ED91AF000C40CEA /* NotificationScheduler.swift */; };
+		B068636F2ED9227300C40CEA /* SunTimesCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863302ED91AF000C40CEA /* SunTimesCalculatorTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B068634B2ED91BEE00C40CEA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B0E8DA1A2ED919F0009D238B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B06863392ED91BEB00C40CEA;
+			remoteInfo = SuntimeAlerts;
+		};
+		B06863552ED91BEE00C40CEA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B0E8DA1A2ED919F0009D238B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B06863392ED91BEB00C40CEA;
+			remoteInfo = SuntimeAlerts;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B06863242ED91AF000C40CEA /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
+		B06863262ED91AF000C40CEA /* SunScheduleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SunScheduleService.swift; sourceTree = "<group>"; };
+		B06863272ED91AF000C40CEA /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
+		B06863282ED91AF000C40CEA /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		B068632B2ED91AF000C40CEA /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewModel.swift; sourceTree = "<group>"; };
+		B068632C2ED91AF000C40CEA /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		B068632E2ED91AF000C40CEA /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		B06863302ED91AF000C40CEA /* SunTimesCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SunTimesCalculatorTests.swift; sourceTree = "<group>"; };
+		B06863332ED91AF000C40CEA /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		B06863352ED91AF000C40CEA /* SunTimesCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SunTimesCalculator.swift; sourceTree = "<group>"; };
+		B068633A2ED91BEB00C40CEA /* SuntimeAlerts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SuntimeAlerts.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B068633D2ED91BEB00C40CEA /* SuntimeAlertsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsApp.swift; sourceTree = "<group>"; };
+		B068633F2ED91BEB00C40CEA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B06863412ED91BED00C40CEA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B06863442ED91BED00C40CEA /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		B068634A2ED91BEE00C40CEA /* SuntimeAlertsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuntimeAlertsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B068634E2ED91BEE00C40CEA /* SuntimeAlertsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsTests.swift; sourceTree = "<group>"; };
+		B06863542ED91BEE00C40CEA /* SuntimeAlertsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuntimeAlertsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B06863582ED91BEE00C40CEA /* SuntimeAlertsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITests.swift; sourceTree = "<group>"; };
+		B068635A2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITestsLaunchTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B06863372ED91BEB00C40CEA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B06863472ED91BEE00C40CEA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B06863512ED91BEE00C40CEA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B06863232ED91AF000C40CEA /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B06863242ED91AF000C40CEA /* NotificationScheduler.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		B06863252ED91AF000C40CEA /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				B06863262ED91AF000C40CEA /* SunScheduleService.swift */,
+				B06863272ED91AF000C40CEA /* LocationService.swift */,
+				B06863282ED91AF000C40CEA /* SettingsStore.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		B06863292ED91AF000C40CEA /* Presentation */ = {
+			isa = PBXGroup;
+			children = (
+				B068632A2ED91AF000C40CEA /* ViewModels */,
+				B068632D2ED91AF000C40CEA /* Views */,
+			);
+			path = Presentation;
+			sourceTree = "<group>";
+		};
+		B068632A2ED91AF000C40CEA /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				B068632B2ED91AF000C40CEA /* HomeViewModel.swift */,
+				B068632C2ED91AF000C40CEA /* SettingsViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		B068632D2ED91AF000C40CEA /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B068632E2ED91AF000C40CEA /* RootView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		B068632F2ED91AF000C40CEA /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				B06863302ED91AF000C40CEA /* SunTimesCalculatorTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		B06863312ED91AF000C40CEA /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				B06863322ED91AF000C40CEA /* Models */,
+				B06863342ED91AF000C40CEA /* Services */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		B06863322ED91AF000C40CEA /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B06863332ED91AF000C40CEA /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B06863342ED91AF000C40CEA /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B06863352ED91AF000C40CEA /* SunTimesCalculator.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		B068633B2ED91BEB00C40CEA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B068633A2ED91BEB00C40CEA /* SuntimeAlerts.app */,
+				B068634A2ED91BEE00C40CEA /* SuntimeAlertsTests.xctest */,
+				B06863542ED91BEE00C40CEA /* SuntimeAlertsUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B068633C2ED91BEB00C40CEA /* SuntimeAlerts */ = {
+			isa = PBXGroup;
+			children = (
+				B068633D2ED91BEB00C40CEA /* SuntimeAlertsApp.swift */,
+				B068633F2ED91BEB00C40CEA /* ContentView.swift */,
+				B06863412ED91BED00C40CEA /* Assets.xcassets */,
+				B06863432ED91BED00C40CEA /* Preview Content */,
+			);
+			path = SuntimeAlerts;
+			sourceTree = "<group>";
+		};
+		B06863432ED91BED00C40CEA /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				B06863442ED91BED00C40CEA /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		B068634D2ED91BEE00C40CEA /* SuntimeAlertsTests */ = {
+			isa = PBXGroup;
+			children = (
+				B068634E2ED91BEE00C40CEA /* SuntimeAlertsTests.swift */,
+			);
+			path = SuntimeAlertsTests;
+			sourceTree = "<group>";
+		};
+		B06863572ED91BEE00C40CEA /* SuntimeAlertsUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B06863582ED91BEE00C40CEA /* SuntimeAlertsUITests.swift */,
+				B068635A2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift */,
+			);
+			path = SuntimeAlertsUITests;
+			sourceTree = "<group>";
+		};
+		B0E8DA192ED919F0009D238B = {
+			isa = PBXGroup;
+			children = (
+				B06863252ED91AF000C40CEA /* Data */,
+				B06863312ED91AF000C40CEA /* Domain */,
+				B06863292ED91AF000C40CEA /* Presentation */,
+				B06863232ED91AF000C40CEA /* Services */,
+				B068632F2ED91AF000C40CEA /* Tests */,
+				B068633C2ED91BEB00C40CEA /* SuntimeAlerts */,
+				B068634D2ED91BEE00C40CEA /* SuntimeAlertsTests */,
+				B06863572ED91BEE00C40CEA /* SuntimeAlertsUITests */,
+				B068633B2ED91BEB00C40CEA /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B06863392ED91BEB00C40CEA /* SuntimeAlerts */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B068635C2ED91BEE00C40CEA /* Build configuration list for PBXNativeTarget "SuntimeAlerts" */;
+			buildPhases = (
+				B06863362ED91BEB00C40CEA /* Sources */,
+				B06863372ED91BEB00C40CEA /* Frameworks */,
+				B06863382ED91BEB00C40CEA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SuntimeAlerts;
+			productName = SuntimeAlerts;
+			productReference = B068633A2ED91BEB00C40CEA /* SuntimeAlerts.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B06863492ED91BEE00C40CEA /* SuntimeAlertsTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B068635F2ED91BEE00C40CEA /* Build configuration list for PBXNativeTarget "SuntimeAlertsTests" */;
+			buildPhases = (
+				B06863462ED91BEE00C40CEA /* Sources */,
+				B06863472ED91BEE00C40CEA /* Frameworks */,
+				B06863482ED91BEE00C40CEA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B068634C2ED91BEE00C40CEA /* PBXTargetDependency */,
+			);
+			name = SuntimeAlertsTests;
+			productName = SuntimeAlertsTests;
+			productReference = B068634A2ED91BEE00C40CEA /* SuntimeAlertsTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		B06863532ED91BEE00C40CEA /* SuntimeAlertsUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B06863622ED91BEE00C40CEA /* Build configuration list for PBXNativeTarget "SuntimeAlertsUITests" */;
+			buildPhases = (
+				B06863502ED91BEE00C40CEA /* Sources */,
+				B06863512ED91BEE00C40CEA /* Frameworks */,
+				B06863522ED91BEE00C40CEA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B06863562ED91BEE00C40CEA /* PBXTargetDependency */,
+			);
+			name = SuntimeAlertsUITests;
+			productName = SuntimeAlertsUITests;
+			productReference = B06863542ED91BEE00C40CEA /* SuntimeAlertsUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B0E8DA1A2ED919F0009D238B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					B06863392ED91BEB00C40CEA = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					B06863492ED91BEE00C40CEA = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = B06863392ED91BEB00C40CEA;
+					};
+					B06863532ED91BEE00C40CEA = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = B06863392ED91BEB00C40CEA;
+					};
+				};
+			};
+			buildConfigurationList = B0E8DA1D2ED919F0009D238B /* Build configuration list for PBXProject "SuntimeAlerts" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B0E8DA192ED919F0009D238B;
+			productRefGroup = B068633B2ED91BEB00C40CEA /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B06863392ED91BEB00C40CEA /* SuntimeAlerts */,
+				B06863492ED91BEE00C40CEA /* SuntimeAlertsTests */,
+				B06863532ED91BEE00C40CEA /* SuntimeAlertsUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B06863382ED91BEB00C40CEA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B06863452ED91BED00C40CEA /* Preview Assets.xcassets in Resources */,
+				B06863422ED91BED00C40CEA /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B06863482ED91BEE00C40CEA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B06863522ED91BEE00C40CEA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B06863362ED91BEB00C40CEA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B06863402ED91BEB00C40CEA /* ContentView.swift in Sources */,
+				B068636B2ED91D5700C40CEA /* HomeViewModel.swift in Sources */,
+				B068633E2ED91BEB00C40CEA /* SuntimeAlertsApp.swift in Sources */,
+				B06863662ED91D3D00C40CEA /* LocationService.swift in Sources */,
+				B068636C2ED91D5B00C40CEA /* RootView.swift in Sources */,
+				B06863682ED91D4D00C40CEA /* Models.swift in Sources */,
+				B06863672ED91D3D00C40CEA /* SettingsStore.swift in Sources */,
+				B06863692ED91D5100C40CEA /* SunTimesCalculator.swift in Sources */,
+				B06863652ED91D3D00C40CEA /* SunScheduleService.swift in Sources */,
+				B068636A2ED91D5700C40CEA /* SettingsViewModel.swift in Sources */,
+				B068636D2ED91D5F00C40CEA /* NotificationScheduler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B06863462ED91BEE00C40CEA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B068634F2ED91BEE00C40CEA /* SuntimeAlertsTests.swift in Sources */,
+				B068636F2ED9227300C40CEA /* SunTimesCalculatorTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B06863502ED91BEE00C40CEA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B06863592ED91BEE00C40CEA /* SuntimeAlertsUITests.swift in Sources */,
+				B068635B2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B068634C2ED91BEE00C40CEA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B06863392ED91BEB00C40CEA /* SuntimeAlerts */;
+			targetProxy = B068634B2ED91BEE00C40CEA /* PBXContainerItemProxy */;
+		};
+		B06863562ED91BEE00C40CEA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B06863392ED91BEB00C40CEA /* SuntimeAlerts */;
+			targetProxy = B06863552ED91BEE00C40CEA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B068635D2ED91BEE00C40CEA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_ASSET_PATHS = "\"SuntimeAlerts/Preview Content\"";
+				DEVELOPMENT_TEAM = 2T2JLZMQ73;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bfalls.SuntimeAlerts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B068635E2ED91BEE00C40CEA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_ASSET_PATHS = "\"SuntimeAlerts/Preview Content\"";
+				DEVELOPMENT_TEAM = 2T2JLZMQ73;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bfalls.SuntimeAlerts;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B06863602ED91BEE00C40CEA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 2T2JLZMQ73;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bfalls.SuntimeAlertsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SuntimeAlerts.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SuntimeAlerts";
+			};
+			name = Debug;
+		};
+		B06863612ED91BEE00C40CEA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 2T2JLZMQ73;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bfalls.SuntimeAlertsTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SuntimeAlerts.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SuntimeAlerts";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B06863632ED91BEE00C40CEA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 2T2JLZMQ73;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bfalls.SuntimeAlertsUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SuntimeAlerts;
+			};
+			name = Debug;
+		};
+		B06863642ED91BEE00C40CEA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 2T2JLZMQ73;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bfalls.SuntimeAlertsUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SuntimeAlerts;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B0E8DA1B2ED919F0009D238B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Debug;
+		};
+		B0E8DA1C2ED919F0009D238B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B068635C2ED91BEE00C40CEA /* Build configuration list for PBXNativeTarget "SuntimeAlerts" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B068635D2ED91BEE00C40CEA /* Debug */,
+				B068635E2ED91BEE00C40CEA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B068635F2ED91BEE00C40CEA /* Build configuration list for PBXNativeTarget "SuntimeAlertsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B06863602ED91BEE00C40CEA /* Debug */,
+				B06863612ED91BEE00C40CEA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B06863622ED91BEE00C40CEA /* Build configuration list for PBXNativeTarget "SuntimeAlertsUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B06863632ED91BEE00C40CEA /* Debug */,
+				B06863642ED91BEE00C40CEA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B0E8DA1D2ED919F0009D238B /* Build configuration list for PBXProject "SuntimeAlerts" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B0E8DA1B2ED919F0009D238B /* Debug */,
+				B0E8DA1C2ED919F0009D238B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = B0E8DA1A2ED919F0009D238B /* Project object */;
+}
