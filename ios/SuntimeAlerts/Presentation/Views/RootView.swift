@@ -3,18 +3,33 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var homeViewModel: HomeViewModel
     @EnvironmentObject private var settingsViewModel: SettingsViewModel
+    @StateObject private var onboardingViewModel: OnboardingViewModel
+
+    init(onboardingViewModel: OnboardingViewModel) {
+        _onboardingViewModel = StateObject(wrappedValue: onboardingViewModel)
+    }
 
     var body: some View {
-        NavigationStack {
-            HomeView()
-                .toolbar {
-                    NavigationLink("Settings") {
-                        SettingsView()
-                    }
+        Group {
+            if onboardingViewModel.onboardingComplete {
+                NavigationStack {
+                    HomeView()
+                        .toolbar {
+                            NavigationLink("Settings") {
+                                SettingsView()
+                            }
+                        }
                 }
-        }
-        .task {
-            await homeViewModel.refreshIfNeeded()
+                .task {
+                    await homeViewModel.refreshIfNeeded()
+                }
+            } else if onboardingViewModel.isLoaded {
+                OnboardingView(viewModel: onboardingViewModel) {
+                    onboardingViewModel.onboardingComplete = true
+                }
+            } else {
+                ProgressView()
+            }
         }
     }
 }

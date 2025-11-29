@@ -6,7 +6,7 @@ struct SuntimeAlertsApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(onboardingViewModel: container.onboardingViewModel)
                 .environmentObject(container.settingsViewModel)
                 .environmentObject(container.homeViewModel)
         }
@@ -21,6 +21,7 @@ final class AppContainer: ObservableObject {
     let notificationScheduler: NotificationScheduler
     let homeViewModel: HomeViewModel
     let settingsViewModel: SettingsViewModel
+    let onboardingViewModel: OnboardingViewModel
 
     init() {
         self.settingsStore = UserDefaultsSettingsStore()
@@ -30,5 +31,6 @@ final class AppContainer: ObservableObject {
         self.scheduleService = SunScheduleService(calculator: sunTimesCalculator, settingsStore: settingsStore, notificationScheduler: notificationScheduler)
         self.homeViewModel = HomeViewModel(scheduleService: scheduleService, locationService: locationService, settingsStore: settingsStore)
         self.settingsViewModel = SettingsViewModel(settingsStore: settingsStore)
+        self.onboardingViewModel = OnboardingViewModel(settingsStore: settingsStore)
     }
 }
