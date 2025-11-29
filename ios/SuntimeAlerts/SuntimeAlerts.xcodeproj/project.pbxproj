@@ -20,10 +20,11 @@
 		B06863682ED91D4D00C40CEA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863332ED91AF000C40CEA /* Models.swift */; };
 		B06863692ED91D5100C40CEA /* SunTimesCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863352ED91AF000C40CEA /* SunTimesCalculator.swift */; };
 		B068636A2ED91D5700C40CEA /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632C2ED91AF000C40CEA /* SettingsViewModel.swift */; };
-		B068636B2ED91D5700C40CEA /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632B2ED91AF000C40CEA /* HomeViewModel.swift */; };
-		B068636C2ED91D5B00C40CEA /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632E2ED91AF000C40CEA /* RootView.swift */; };
-		B068636D2ED91D5F00C40CEA /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863242ED91AF000C40CEA /* NotificationScheduler.swift */; };
-		B068636F2ED9227300C40CEA /* SunTimesCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863302ED91AF000C40CEA /* SunTimesCalculatorTests.swift */; };
+                B068636B2ED91D5700C40CEA /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632B2ED91AF000C40CEA /* HomeViewModel.swift */; };
+                B068636C2ED91D5B00C40CEA /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B068632E2ED91AF000C40CEA /* RootView.swift */; };
+                B068636D2ED91D5F00C40CEA /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863242ED91AF000C40CEA /* NotificationScheduler.swift */; };
+                B068636F2ED9227300C40CEA /* SunTimesCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863302ED91AF000C40CEA /* SunTimesCalculatorTests.swift */; };
+               B06A10012F3D4A9F00A1B2C3 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06A10002F3D4A9F00A1B2C3 /* DesignSystem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,8 +63,9 @@
 		B068634A2ED91BEE00C40CEA /* SuntimeAlertsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuntimeAlertsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B068634E2ED91BEE00C40CEA /* SuntimeAlertsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsTests.swift; sourceTree = "<group>"; };
 		B06863542ED91BEE00C40CEA /* SuntimeAlertsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SuntimeAlertsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B06863582ED91BEE00C40CEA /* SuntimeAlertsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITests.swift; sourceTree = "<group>"; };
-		B068635A2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITestsLaunchTests.swift; sourceTree = "<group>"; };
+                B06863582ED91BEE00C40CEA /* SuntimeAlertsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITests.swift; sourceTree = "<group>"; };
+                B068635A2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITestsLaunchTests.swift; sourceTree = "<group>"; };
+               B06A10002F3D4A9F00A1B2C3 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,15 +111,16 @@
 			path = Data;
 			sourceTree = "<group>";
 		};
-		B06863292ED91AF000C40CEA /* Presentation */ = {
-			isa = PBXGroup;
-			children = (
-				B068632A2ED91AF000C40CEA /* ViewModels */,
-				B068632D2ED91AF000C40CEA /* Views */,
-			);
-			path = Presentation;
-			sourceTree = "<group>";
-		};
+                B06863292ED91AF000C40CEA /* Presentation */ = {
+                        isa = PBXGroup;
+                        children = (
+                                B068632A2ED91AF000C40CEA /* ViewModels */,
+                                B068632D2ED91AF000C40CEA /* Views */,
+                               B06A10002F3D4A9F00A1B2C3 /* DesignSystem.swift */,
+                        );
+                        path = Presentation;
+                        sourceTree = "<group>";
+                };
 		B068632A2ED91AF000C40CEA /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
@@ -361,10 +364,11 @@
 			files = (
 				B06863402ED91BEB00C40CEA /* ContentView.swift in Sources */,
 				B068636B2ED91D5700C40CEA /* HomeViewModel.swift in Sources */,
-				B068633E2ED91BEB00C40CEA /* SuntimeAlertsApp.swift in Sources */,
-				B06863662ED91D3D00C40CEA /* LocationService.swift in Sources */,
-				B068636C2ED91D5B00C40CEA /* RootView.swift in Sources */,
-				B06863682ED91D4D00C40CEA /* Models.swift in Sources */,
+                                B068633E2ED91BEB00C40CEA /* SuntimeAlertsApp.swift in Sources */,
+                                B06863662ED91D3D00C40CEA /* LocationService.swift in Sources */,
+                                B068636C2ED91D5B00C40CEA /* RootView.swift in Sources */,
+                                B06A10012F3D4A9F00A1B2C3 /* DesignSystem.swift in Sources */,
+                                B06863682ED91D4D00C40CEA /* Models.swift in Sources */,
 				B06863672ED91D3D00C40CEA /* SettingsStore.swift in Sources */,
 				B06863692ED91D5100C40CEA /* SunTimesCalculator.swift in Sources */,
 				B06863652ED91D3D00C40CEA /* SunScheduleService.swift in Sources */,
