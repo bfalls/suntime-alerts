@@ -54,6 +54,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
     implementation("androidx.datastore:datastore-preferences:1.2.0")
     implementation(libs.androidx.tools.core)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
