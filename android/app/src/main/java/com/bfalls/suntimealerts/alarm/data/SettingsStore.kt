@@ -70,6 +70,9 @@ class SettingsStore(private val context: Context) {
                 val loc = settings.fixedLocation ?: Coordinate(0.0, 0.0)
                 prefs[fixedLat] = loc.latitude
                 prefs[fixedLon] = loc.longitude
+            } else {
+                prefs.remove(fixedLat)
+                prefs.remove(fixedLon)
             }
         }
     }

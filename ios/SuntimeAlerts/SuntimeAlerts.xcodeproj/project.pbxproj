@@ -25,6 +25,8 @@
                 B068636D2ED91D5F00C40CEA /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863242ED91AF000C40CEA /* NotificationScheduler.swift */; };
                 B068636F2ED9227300C40CEA /* SunTimesCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06863302ED91AF000C40CEA /* SunTimesCalculatorTests.swift */; };
                B06A10012F3D4A9F00A1B2C3 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B06A10002F3D4A9F00A1B2C3 /* DesignSystem.swift */; };
+                B0A0F1022F4E000100000001 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A0F1002F4E000100000001 /* OnboardingViewModel.swift */; };
+                B0A0F1032F4E000100000001 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A0F1012F4E000100000001 /* OnboardingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,6 +68,8 @@
                 B06863582ED91BEE00C40CEA /* SuntimeAlertsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITests.swift; sourceTree = "<group>"; };
                 B068635A2ED91BEE00C40CEA /* SuntimeAlertsUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SuntimeAlertsUITestsLaunchTests.swift; sourceTree = "<group>"; };
                B06A10002F3D4A9F00A1B2C3 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+                B0A0F1002F4E000100000001 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
+                B0A0F1012F4E000100000001 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,23 +125,25 @@
                         path = Presentation;
                         sourceTree = "<group>";
                 };
-		B068632A2ED91AF000C40CEA /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				B068632B2ED91AF000C40CEA /* HomeViewModel.swift */,
-				B068632C2ED91AF000C40CEA /* SettingsViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		B068632D2ED91AF000C40CEA /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				B068632E2ED91AF000C40CEA /* RootView.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
+                B068632A2ED91AF000C40CEA /* ViewModels */ = {
+                        isa = PBXGroup;
+                        children = (
+                                B068632B2ED91AF000C40CEA /* HomeViewModel.swift */,
+                                B068632C2ED91AF000C40CEA /* SettingsViewModel.swift */,
+                                B0A0F1002F4E000100000001 /* OnboardingViewModel.swift */,
+                        );
+                        path = ViewModels;
+                        sourceTree = "<group>";
+                };
+                B068632D2ED91AF000C40CEA /* Views */ = {
+                        isa = PBXGroup;
+                        children = (
+                                B068632E2ED91AF000C40CEA /* RootView.swift */,
+                                B0A0F1012F4E000100000001 /* OnboardingView.swift */,
+                        );
+                        path = Views;
+                        sourceTree = "<group>";
+                };
 		B068632F2ED91AF000C40CEA /* Tests */ = {
 			isa = PBXGroup;
 			children = (
@@ -371,12 +377,14 @@
                                 B06863682ED91D4D00C40CEA /* Models.swift in Sources */,
 				B06863672ED91D3D00C40CEA /* SettingsStore.swift in Sources */,
 				B06863692ED91D5100C40CEA /* SunTimesCalculator.swift in Sources */,
-				B06863652ED91D3D00C40CEA /* SunScheduleService.swift in Sources */,
-				B068636A2ED91D5700C40CEA /* SettingsViewModel.swift in Sources */,
-				B068636D2ED91D5F00C40CEA /* NotificationScheduler.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+                                B06863652ED91D3D00C40CEA /* SunScheduleService.swift in Sources */,
+                                B068636A2ED91D5700C40CEA /* SettingsViewModel.swift in Sources */,
+                                B068636D2ED91D5F00C40CEA /* NotificationScheduler.swift in Sources */,
+                                B0A0F1022F4E000100000001 /* OnboardingViewModel.swift in Sources */,
+                                B0A0F1032F4E000100000001 /* OnboardingView.swift in Sources */,
+                        );
+                        runOnlyForDeploymentPostprocessing = 0;
+                };
 		B06863462ED91BEE00C40CEA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
