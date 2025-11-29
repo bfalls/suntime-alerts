@@ -48,6 +48,7 @@ fastlane/test_output
 *.swp
 *.swo
 *.orig
+*.patch
 
 # Temp / backup
 *.tmp
