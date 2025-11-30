@@ -2,15 +2,22 @@ package com.bfalls.suntimealerts.alarm.presentation.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -43,49 +50,63 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            Text(
-                text = when (state.step) {
-                    OnboardingStep.WELCOME -> "Welcome"
-                    OnboardingStep.LOCATION -> "Choose location"
-                    OnboardingStep.NOTIFICATIONS -> "Notifications"
-                    OnboardingStep.ALARMS -> "Initial alarms"
-                    OnboardingStep.SUMMARY -> "Summary"
-                },
-                fontWeight = FontWeight.SemiBold
-            )
-
-            when (state.step) {
-                OnboardingStep.WELCOME -> WelcomeStep()
-                OnboardingStep.LOCATION -> LocationStep(
-                    state,
-                    onLocationModeChanged,
-                    onCityQueryChanged,
-                    onCitySelected
-                )
-                OnboardingStep.NOTIFICATIONS -> NotificationStep(state.notificationsEnabled, onNotificationsChanged)
-                OnboardingStep.ALARMS -> AlarmStep(state, onSunriseEnabledChanged, onSunsetEnabledChanged, onSunriseOffsetChanged, onSunsetOffsetChanged)
-                OnboardingStep.SUMMARY -> SummaryStep(state)
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                if (state.step != OnboardingStep.WELCOME) {
-                    OutlinedButton(onClick = onBack) { Text("Back") }
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            bottomBar = {
+                Surface {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (state.step != OnboardingStep.WELCOME) {
+                            OutlinedButton(onClick = onBack) { Text("Back") }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                        Button(
+                            onClick = { if (state.step == OnboardingStep.SUMMARY) onComplete() else onNext() },
+                            enabled = canAdvance
+                        ) {
+                            Text(if (state.step == OnboardingStep.SUMMARY) "Save & Start" else "Next")
+                        }
+                    }
                 }
-                Button(
-                    onClick = { if (state.step == OnboardingStep.SUMMARY) onComplete() else onNext() },
-                    enabled = canAdvance
-                ) {
-                    Text(if (state.step == OnboardingStep.SUMMARY) "Save & Start" else "Next")
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(paddingValues)
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Text(
+                    text = when (state.step) {
+                        OnboardingStep.WELCOME -> "Welcome"
+                        OnboardingStep.LOCATION -> "Choose location"
+                        OnboardingStep.NOTIFICATIONS -> "Notifications"
+                        OnboardingStep.ALARMS -> "Initial alarms"
+                        OnboardingStep.SUMMARY -> "Summary"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                when (state.step) {
+                    OnboardingStep.WELCOME -> WelcomeStep()
+                    OnboardingStep.LOCATION -> LocationStep(
+                        state,
+                        onLocationModeChanged,
+                        onCityQueryChanged,
+                        onCitySelected
+                    )
+                    OnboardingStep.NOTIFICATIONS -> NotificationStep(state.notificationsEnabled, onNotificationsChanged)
+                    OnboardingStep.ALARMS -> AlarmStep(state, onSunriseEnabledChanged, onSunsetEnabledChanged, onSunriseOffsetChanged, onSunsetOffsetChanged)
+                    OnboardingStep.SUMMARY -> SummaryStep(state)
                 }
             }
         }
@@ -129,8 +150,14 @@ private fun LocationStep(
                 if (state.cityResults.isEmpty()) {
                     Text("No matching cities yet")
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.cityResults.take(8).forEach { city ->
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
+                        items(state.cityResults) { city ->
                             OutlinedButton(
                                 onClick = { onCitySelected(city) },
                                 modifier = Modifier.fillMaxWidth()
