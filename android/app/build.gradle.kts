@@ -55,6 +55,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.2.0")
     implementation(libs.androidx.tools.core)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
+    implementation(libs.gson)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
