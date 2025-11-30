@@ -1,5 +1,7 @@
 package com.bfalls.suntimealerts.alarm.presentation.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,18 +15,33 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
@@ -130,12 +147,30 @@ private fun LocationStep(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("How should we find your location?")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { onLocationModeChanged(LocationMode.DEVICE) }) {
-                Text(if (state.locationMode == LocationMode.DEVICE) "• Device" else "Device")
-            }
-            TextButton(onClick = { onLocationModeChanged(LocationMode.FIXED) }) {
-                Text(if (state.locationMode == LocationMode.FIXED) "• Manual" else "Manual")
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            val options = listOf(
+                LocationMode.DEVICE to "Device",
+                LocationMode.FIXED to "Manual"
+            )
+            options.forEachIndexed { index, (mode, label) ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                    selected = state.locationMode == mode,
+                    onClick = { onLocationModeChanged(mode) },
+                    icon = {
+                        when (mode) {
+                            LocationMode.DEVICE -> Icon(
+                                imageVector = Icons.Filled.MyLocation,
+                                contentDescription = null
+                            )
+                            LocationMode.FIXED -> Icon(
+                                imageVector = Icons.Filled.TouchApp,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    label = { Text(label) }
+                )
             }
         }
         if (state.locationMode == LocationMode.FIXED) {
@@ -144,7 +179,20 @@ private fun LocationStep(
                 onValueChange = onCityQueryChanged,
                 label = { Text("City") },
                 placeholder = { Text("Start typing a city name") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                )
             )
             if (state.cityQuery.trim().length >= 2) {
                 if (state.cityResults.isEmpty()) {
@@ -158,13 +206,29 @@ private fun LocationStep(
                         contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
                         items(state.cityResults) { city ->
-                            OutlinedButton(
-                                onClick = { onCitySelected(city) },
-                                modifier = Modifier.fillMaxWidth()
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(
+                                        role = Role.Button,
+                                        onClick = { onCitySelected(city) }
+                                    ),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.elevatedCardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
+                                ),
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                             ) {
-                                Column {
-                                    Text("${city.name}, ${city.countryCode}")
-                                    Text("${city.admin1Code} · ${city.lat}, ${city.lon}")
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("${city.name}, ${city.countryCode}", fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "${city.admin1Code} · ${city.lat}, ${city.lon}",
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                    )
                                 }
                             }
                         }
