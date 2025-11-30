@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingState
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingStep
+import com.bfalls.suntimealerts.cities.data.City
 
 @Composable
 fun OnboardingScreen(
@@ -33,8 +34,8 @@ fun OnboardingScreen(
     onSunsetEnabledChanged: (Boolean) -> Unit,
     onSunriseOffsetChanged: (Int) -> Unit,
     onSunsetOffsetChanged: (Int) -> Unit,
-    onFixedLatitudeChanged: (String) -> Unit,
-    onFixedLongitudeChanged: (String) -> Unit,
+    onCityQueryChanged: (String) -> Unit,
+    onCitySelected: (City) -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit,
     onComplete: () -> Unit,
@@ -61,7 +62,12 @@ fun OnboardingScreen(
 
             when (state.step) {
                 OnboardingStep.WELCOME -> WelcomeStep()
-                OnboardingStep.LOCATION -> LocationStep(state, onLocationModeChanged, onFixedLatitudeChanged, onFixedLongitudeChanged)
+                OnboardingStep.LOCATION -> LocationStep(
+                    state,
+                    onLocationModeChanged,
+                    onCityQueryChanged,
+                    onCitySelected
+                )
                 OnboardingStep.NOTIFICATIONS -> NotificationStep(state.notificationsEnabled, onNotificationsChanged)
                 OnboardingStep.ALARMS -> AlarmStep(state, onSunriseEnabledChanged, onSunsetEnabledChanged, onSunriseOffsetChanged, onSunsetOffsetChanged)
                 OnboardingStep.SUMMARY -> SummaryStep(state)
@@ -98,8 +104,8 @@ private fun WelcomeStep() {
 private fun LocationStep(
     state: OnboardingState,
     onLocationModeChanged: (LocationMode) -> Unit,
-    onFixedLatitudeChanged: (String) -> Unit,
-    onFixedLongitudeChanged: (String) -> Unit
+    onCityQueryChanged: (String) -> Unit,
+    onCitySelected: (City) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("How should we find your location?")
@@ -113,17 +119,46 @@ private fun LocationStep(
         }
         if (state.locationMode == LocationMode.FIXED) {
             OutlinedTextField(
-                value = state.fixedLatitude,
-                onValueChange = onFixedLatitudeChanged,
-                label = { Text("Latitude") },
+                value = state.cityQuery,
+                onValueChange = onCityQueryChanged,
+                label = { Text("City") },
+                placeholder = { Text("Start typing a city name") },
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
-                value = state.fixedLongitude,
-                onValueChange = onFixedLongitudeChanged,
-                label = { Text("Longitude") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (state.cityQuery.trim().length >= 2) {
+                if (state.cityResults.isEmpty()) {
+                    Text("No matching cities yet")
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.cityResults.take(8).forEach { city ->
+                            OutlinedButton(
+                                onClick = { onCitySelected(city) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column {
+                                    Text("${city.name}, ${city.countryCode}")
+                                    Text("${city.admin1Code} · ${city.lat}, ${city.lon}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            when {
+                state.selectedCity != null -> {
+                    val selected = state.selectedCity
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Selected city")
+                        Text("${selected.name}, ${selected.countryCode}")
+                        Text("Lat/Lon: ${selected.lat}, ${selected.lon}")
+                    }
+                }
+
+                state.fixedLatitude.isNotBlank() && state.fixedLongitude.isNotBlank() -> {
+                    Text("Current coordinates: ${state.fixedLatitude}, ${state.fixedLongitude}")
+                }
+            }
         }
     }
 }
@@ -176,7 +211,16 @@ private fun AlarmStep(
 @Composable
 private fun SummaryStep(state: OnboardingState) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Location: ${if (state.locationMode == LocationMode.DEVICE) "Device" else "Manual"}")
+        val locationSummary = if (state.locationMode == LocationMode.DEVICE) {
+            "Device"
+        } else {
+            when {
+                state.selectedCity != null -> "${state.selectedCity.name}, ${state.selectedCity.countryCode}"
+                state.fixedLatitude.isNotBlank() && state.fixedLongitude.isNotBlank() -> "Lat ${state.fixedLatitude}, Lon ${state.fixedLongitude}"
+                else -> "Manual coordinates"
+            }
+        }
+        Text("Location: $locationSummary")
         Text("Sunrise alarm: ${if (state.sunriseEnabled) "On" else "Off"} @ ${state.sunriseOffsetMinutes} min")
         Text("Sunset alarm: ${if (state.sunsetEnabled) "On" else "Off"} @ ${state.sunsetOffsetMinutes} min")
     }
