@@ -241,7 +241,7 @@ private fun LocationStep(
                     val selected = state.selectedCity
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Selected city")
-                        Text("${selected.name}, ${selected.countryCode}")
+                        Text("${selected.name}, ${selected.admin1Code}, ${selected.countryCode}")
                         Text("Lat/Lon: ${selected.lat}, ${selected.lon}")
                     }
                 }
@@ -306,7 +306,7 @@ private fun SummaryStep(state: OnboardingState) {
             "Device"
         } else {
             when {
-                state.selectedCity != null -> "${state.selectedCity.name}, ${state.selectedCity.countryCode}"
+                state.selectedCity != null -> "${state.selectedCity.name}, ${state.selectedCity.admin1Code}, ${state.selectedCity.countryCode}"
                 state.fixedLatitude.isNotBlank() && state.fixedLongitude.isNotBlank() -> "Lat ${state.fixedLatitude}, Lon ${state.fixedLongitude}"
                 else -> "Manual coordinates"
             }
