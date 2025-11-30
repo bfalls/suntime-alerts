@@ -45,10 +45,12 @@ class MainActivity : ComponentActivity() {
             val locationService = remember { LocationService(application) }
             val notificationScheduler = remember { NotificationScheduler(applicationContext) }
             val scheduleService = remember { SunScheduleService(SunTimesCalculator(), settingsStore, notificationScheduler) }
-            val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService) }
-            val onboardingViewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(settingsStore))
-            val onboardingState by onboardingViewModel.state.collectAsState()
             val cityRepository = remember { CityRepository(applicationContext) }
+            val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService) }
+            val onboardingViewModel: OnboardingViewModel = viewModel(
+                factory = OnboardingViewModelFactory(settingsStore, cityRepository)
+            )
+            val onboardingState by onboardingViewModel.state.collectAsState()
             val cityImportViewModel: CityImportViewModel = viewModel(
                 factory = CityImportViewModelFactory(cityRepository)
             )
@@ -66,8 +68,8 @@ class MainActivity : ComponentActivity() {
                         onSunsetEnabledChanged = onboardingViewModel::updateSunsetEnabled,
                         onSunriseOffsetChanged = onboardingViewModel::updateSunriseOffset,
                         onSunsetOffsetChanged = onboardingViewModel::updateSunsetOffset,
-                        onFixedLatitudeChanged = onboardingViewModel::updateFixedLatitude,
-                        onFixedLongitudeChanged = onboardingViewModel::updateFixedLongitude,
+                        onCityQueryChanged = onboardingViewModel::updateCityQuery,
+                        onCitySelected = onboardingViewModel::selectCity,
                         onNext = onboardingViewModel::nextStep,
                         onBack = onboardingViewModel::previousStep,
                         onComplete = { onboardingViewModel.complete { } },

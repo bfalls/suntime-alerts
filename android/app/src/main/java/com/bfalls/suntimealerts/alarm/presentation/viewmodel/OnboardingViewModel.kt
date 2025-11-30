@@ -7,6 +7,9 @@ import com.bfalls.suntimealerts.alarm.data.SettingsStore
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.cities.data.City
+import com.bfalls.suntimealerts.cities.data.CityRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -16,8 +19,11 @@ data class OnboardingState(
     val isLoaded: Boolean = false,
     val onboardingComplete: Boolean = false,
     val locationMode: LocationMode = LocationMode.DEVICE,
-    val fixedLatitude: String = "0.0",
-    val fixedLongitude: String = "0.0",
+    val fixedLatitude: String = "",
+    val fixedLongitude: String = "",
+    val cityQuery: String = "",
+    val cityResults: List<City> = emptyList(),
+    val selectedCity: City? = null,
     val notificationsEnabled: Boolean = true,
     val sunriseEnabled: Boolean = true,
     val sunriseOffsetMinutes: Int = 0,
@@ -27,9 +33,14 @@ data class OnboardingState(
 
 enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, ALARMS, SUMMARY }
 
-class OnboardingViewModel(private val settingsStore: SettingsStore) : ViewModel() {
+class OnboardingViewModel(
+    private val settingsStore: SettingsStore,
+    private val cityRepository: CityRepository
+) : ViewModel() {
     private val _state = MutableStateFlow(OnboardingState())
     val state: StateFlow<OnboardingState> = _state
+
+    private var searchJob: Job? = null
 
     init {
         viewModelScope.launch { load() }
@@ -41,8 +52,8 @@ class OnboardingViewModel(private val settingsStore: SettingsStore) : ViewModel(
             isLoaded = true,
             onboardingComplete = settings.onboardingComplete,
             locationMode = settings.locationMode,
-            fixedLatitude = settings.fixedLocation?.latitude?.toString() ?: "0.0",
-            fixedLongitude = settings.fixedLocation?.longitude?.toString() ?: "0.0",
+            fixedLatitude = settings.fixedLocation?.latitude?.toString() ?: "",
+            fixedLongitude = settings.fixedLocation?.longitude?.toString() ?: "",
             notificationsEnabled = settings.sunriseConfig.enabled || settings.sunsetConfig.enabled,
             sunriseEnabled = settings.sunriseConfig.enabled,
             sunriseOffsetMinutes = settings.sunriseConfig.offsetMinutes,
@@ -65,12 +76,27 @@ class OnboardingViewModel(private val settingsStore: SettingsStore) : ViewModel(
         _state.value = _state.value.copy(locationMode = mode)
     }
 
-    fun updateFixedLatitude(text: String) {
-        _state.value = _state.value.copy(fixedLatitude = text)
+    fun updateCityQuery(query: String) {
+        _state.value = _state.value.copy(cityQuery = query, selectedCity = null)
+
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            val results = if (query.trim().length >= 2) {
+                cityRepository.searchCities(query)
+            } else {
+                emptyList()
+            }
+            _state.value = _state.value.copy(cityResults = results)
+        }
     }
 
-    fun updateFixedLongitude(text: String) {
-        _state.value = _state.value.copy(fixedLongitude = text)
+    fun selectCity(city: City) {
+        _state.value = _state.value.copy(
+            selectedCity = city,
+            cityQuery = "${city.name}, ${city.countryCode}",
+            fixedLatitude = city.lat.toString(),
+            fixedLongitude = city.lon.toString()
+        )
     }
 
     fun updateNotifications(enabled: Boolean) {
@@ -103,7 +129,10 @@ class OnboardingViewModel(private val settingsStore: SettingsStore) : ViewModel(
         val current = _state.value
         return when (current.step) {
             OnboardingStep.LOCATION -> if (current.locationMode == LocationMode.FIXED) {
-                current.fixedLatitude.toDoubleOrNull() != null && current.fixedLongitude.toDoubleOrNull() != null
+                current.selectedCity != null || (
+                    current.fixedLatitude.toDoubleOrNull() != null &&
+                        current.fixedLongitude.toDoubleOrNull() != null
+                    )
             } else true
             else -> true
         }
@@ -138,11 +167,14 @@ class OnboardingViewModel(private val settingsStore: SettingsStore) : ViewModel(
     }
 }
 
-class OnboardingViewModelFactory(private val settingsStore: SettingsStore) : ViewModelProvider.Factory {
+class OnboardingViewModelFactory(
+    private val settingsStore: SettingsStore,
+    private val cityRepository: CityRepository
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return OnboardingViewModel(settingsStore) as T
+            return OnboardingViewModel(settingsStore, cityRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
