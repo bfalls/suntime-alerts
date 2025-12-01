@@ -251,6 +251,12 @@ private fun LocationStep(
                 }
             }
         }
+        if (state.locationMode == LocationMode.DEVICE) {
+            when (val label = state.deviceNearestCityLabel) {
+                null -> Text("Resolving nearest city…")
+                else -> Text("Nearest city: $label")
+            }
+        }
     }
 }
 
@@ -303,7 +309,7 @@ private fun AlarmStep(
 private fun SummaryStep(state: OnboardingState) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val locationSummary = if (state.locationMode == LocationMode.DEVICE) {
-            "Device"
+            state.deviceNearestCityLabel?.let { "Device (near $it)" } ?: "Device"
         } else {
             when {
                 state.selectedCity != null -> "${state.selectedCity.name}, ${state.selectedCity.admin1Code}, ${state.selectedCity.countryCode}"
