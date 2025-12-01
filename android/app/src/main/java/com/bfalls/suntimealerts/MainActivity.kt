@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
             val cityRepository = remember { CityRepository(applicationContext) }
             val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService) }
             val onboardingViewModel: OnboardingViewModel = viewModel(
-                factory = OnboardingViewModelFactory(settingsStore, cityRepository)
+                factory = OnboardingViewModelFactory(settingsStore, cityRepository, locationService)
             )
             val onboardingState by onboardingViewModel.state.collectAsState()
             val cityImportViewModel: CityImportViewModel = viewModel(
