@@ -65,20 +65,18 @@ class OnboardingViewModel(
             sunsetEnabled = settings.sunsetConfig.enabled,
             sunsetOffsetMinutes = settings.sunsetConfig.offsetMinutes
         )
-
-        if (settings.locationMode == LocationMode.DEVICE) {
-            refreshDeviceNearestCity()
-        }
     }
 
     fun nextStep() {
         val next = OnboardingStep.values().getOrNull(_state.value.step.ordinal + 1) ?: return
         _state.value = _state.value.copy(step = next)
+        handleStepChanged()
     }
 
     fun previousStep() {
         val prev = OnboardingStep.values().getOrNull(_state.value.step.ordinal - 1) ?: return
         _state.value = _state.value.copy(step = prev)
+        handleStepChanged()
     }
 
     fun updateLocationMode(mode: LocationMode) {
@@ -184,6 +182,13 @@ class OnboardingViewModel(
             settingsStore.save(settings)
             _state.value = _state.value.copy(onboardingComplete = true)
             onFinished()
+        }
+    }
+
+    private fun handleStepChanged() {
+        val current = _state.value
+        if (current.step == OnboardingStep.LOCATION && current.locationMode == LocationMode.DEVICE) {
+            refreshDeviceNearestCity()
         }
     }
 
