@@ -122,7 +122,6 @@ class MainActivity : ComponentActivity() {
                     onboardingState.onboardingComplete -> HomeScreen(viewModel = homeViewModel)
                     else -> OnboardingScreen(
                         state = onboardingState,
-//                        onLocationModeChanged = onboardingViewModel::updateLocationMode,
                         onLocationModeChanged = { mode ->
                             when (mode) {
                                 LocationMode.DEVICE -> {
