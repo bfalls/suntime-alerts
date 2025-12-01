@@ -195,6 +195,7 @@ class OnboardingViewModel(
     private fun refreshDeviceNearestCity() {
         nearestCityJob?.cancel()
         nearestCityJob = viewModelScope.launch {
+            _state.value = _state.value.copy(deviceNearestCityLabel = null)
             Log.d("OnboardingViewModel", "Requesting device location for nearest city")
 
             val coordinate = locationService.currentCoordinate() ?: run {
