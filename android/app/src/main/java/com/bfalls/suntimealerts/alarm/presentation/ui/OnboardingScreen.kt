@@ -253,7 +253,7 @@ private fun LocationStep(
         }
         if (state.locationMode == LocationMode.DEVICE) {
             when (val label = state.deviceNearestCityLabel) {
-                null -> Text("Resolving nearest city…")
+                null -> Text("Finding nearest city…")
                 else -> Text("Nearest city: $label")
             }
         }

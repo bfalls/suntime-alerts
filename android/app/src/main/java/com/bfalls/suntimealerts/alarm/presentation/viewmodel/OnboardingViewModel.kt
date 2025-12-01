@@ -65,20 +65,18 @@ class OnboardingViewModel(
             sunsetEnabled = settings.sunsetConfig.enabled,
             sunsetOffsetMinutes = settings.sunsetConfig.offsetMinutes
         )
-
-        if (settings.locationMode == LocationMode.DEVICE) {
-            refreshDeviceNearestCity()
-        }
     }
 
     fun nextStep() {
         val next = OnboardingStep.values().getOrNull(_state.value.step.ordinal + 1) ?: return
         _state.value = _state.value.copy(step = next)
+        handleStepChanged()
     }
 
     fun previousStep() {
         val prev = OnboardingStep.values().getOrNull(_state.value.step.ordinal - 1) ?: return
         _state.value = _state.value.copy(step = prev)
+        handleStepChanged()
     }
 
     fun updateLocationMode(mode: LocationMode) {
@@ -187,9 +185,17 @@ class OnboardingViewModel(
         }
     }
 
+    private fun handleStepChanged() {
+        val current = _state.value
+        if (current.step == OnboardingStep.LOCATION && current.locationMode == LocationMode.DEVICE) {
+            refreshDeviceNearestCity()
+        }
+    }
+
     private fun refreshDeviceNearestCity() {
         nearestCityJob?.cancel()
         nearestCityJob = viewModelScope.launch {
+            _state.value = _state.value.copy(deviceNearestCityLabel = null)
             Log.d("OnboardingViewModel", "Requesting device location for nearest city")
 
             val coordinate = locationService.currentCoordinate() ?: run {
