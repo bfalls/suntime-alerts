@@ -1,6 +1,8 @@
 package com.bfalls.suntimealerts
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -33,6 +35,7 @@ import com.bfalls.suntimealerts.alarm.presentation.ui.OnboardingScreen
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingViewModel
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingViewModelFactory
+import com.bfalls.suntimealerts.alarm.presentation.viewmodel.PermissionRequestOrigin
 import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
@@ -41,6 +44,11 @@ import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import androidx.compose.runtime.LaunchedEffect
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingStep
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.core.app.ActivityCompat
+import android.provider.Settings
 
 
 class MainActivity : ComponentActivity() {
@@ -63,6 +71,7 @@ class MainActivity : ComponentActivity() {
                 factory = CityImportViewModelFactory(cityRepository)
             )
             val cityImportState by cityImportViewModel.state.collectAsState()
+            var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             val locationPermissionLauncher =
                 rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -71,25 +80,38 @@ class MainActivity : ComponentActivity() {
                         permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
 
+                    val shouldShowRationale =
+                        ActivityCompat.shouldShowRequestPermissionRationale(
+                            this,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) || ActivityCompat.shouldShowRequestPermissionRationale(
+                            this,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+
+                    val permanentlyDenied = !granted && !shouldShowRationale
+
+                    val origin = permissionRequestOrigin ?: PermissionRequestOrigin.AUTOMATIC
+                    permissionRequestOrigin = null
+
                     Log.d(
                         "MainActivity",
                         "Location permission result: granted=$granted perms=$permissions"
                     )
 
-                    if (granted) {
-                        // Now it’s safe to use device location
-                        onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
-                    } else {
-                        // Optionally: show a message or keep them on Manual mode
-                        // e.g. onboardingViewModel.updateLocationMode(LocationMode.FIXED)
-                    }
+                    onboardingViewModel.handleLocationPermissionResult(
+                        granted = granted,
+                        permanentlyDenied = permanentlyDenied,
+                        origin = origin
+                    )
                 }
 
             LaunchedEffect(
                 onboardingState.isLoaded,
                 onboardingState.step,
                 onboardingState.locationMode,
-                onboardingState.deviceNearestCityLabel
+                onboardingState.deviceNearestCityLabel,
+                permissionRequestOrigin
             ) {
                 // If onboarding is showing the LOCATION step and is in DEVICE mode,
                 // and we don't yet have a nearest-city label, run the permission flow.
@@ -98,13 +120,17 @@ class MainActivity : ComponentActivity() {
                     !onboardingState.onboardingComplete &&
                     onboardingState.step == OnboardingStep.LOCATION &&
                     onboardingState.locationMode == LocationMode.DEVICE &&
-                    onboardingState.deviceNearestCityLabel == null
+                    onboardingState.deviceNearestCityLabel == null &&
+                    permissionRequestOrigin == null &&
+                    !onboardingState.locationPermissionPermanentlyDenied
                 ) {
                     if (hasLocationPermission(context)) {
                         // Permission already granted: trigger device-mode behavior
+                        onboardingViewModel.clearLocationPermissionDenial()
                         onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
                     } else {
                         // Ask the system for permission
+                        permissionRequestOrigin = PermissionRequestOrigin.AUTOMATIC
                         locationPermissionLauncher.launch(
                             arrayOf(
                                 Manifest.permission.ACCESS_FINE_LOCATION,
@@ -143,23 +169,33 @@ class MainActivity : ComponentActivity() {
                         onLocationModeChanged = { mode ->
                             when (mode) {
                                 LocationMode.DEVICE -> {
+                                    onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
+
                                     if (hasLocationPermission(context)) {
                                         // Already granted → just switch to device mode
-                                        onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
-                                    } else {
-                                        // Trigger system permission dialog
-                                        locationPermissionLauncher.launch(
-                                            arrayOf(
-                                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                                Manifest.permission.ACCESS_COARSE_LOCATION
-                                            )
-                                        )
+                                        onboardingViewModel.clearLocationPermissionDenial()
+                                        return@OnboardingScreen
                                     }
+
+                                    // Trigger system permission dialog after the UI switches to device mode
+                                    permissionRequestOrigin = PermissionRequestOrigin.USER
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
                                 }
                                 LocationMode.FIXED -> {
                                     onboardingViewModel.updateLocationMode(LocationMode.FIXED)
                                 }
                             }
+                        },
+                        onOpenPermissionSettings = {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", packageName, null)
+                            }
+                            startActivity(intent)
                         },
                         onNotificationsChanged = onboardingViewModel::updateNotifications,
                         onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,
