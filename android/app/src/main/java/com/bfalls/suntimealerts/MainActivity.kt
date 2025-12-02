@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "Preparing offline city data…")
+                            Text(text = "Preparing Suntime Alerts…")
                             Spacer(modifier = Modifier.height(16.dp))
                             CircularProgressIndicator(
                                 progress = cityImportState.progress
