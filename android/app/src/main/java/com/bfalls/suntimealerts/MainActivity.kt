@@ -118,6 +118,24 @@ class MainActivity : ComponentActivity() {
 
             SuntimeAlertsTheme {
                 when {
+                    cityImportState.isImporting -> Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "Preparing offline city data…")
+                            Spacer(modifier = Modifier.height(16.dp))
+                            CircularProgressIndicator(
+                                progress = cityImportState.progress
+                            )
+                            if (cityImportState.total > 0) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "${cityImportState.current} / ${cityImportState.total}"
+                                )
+                            }
+                        }
+                    }
                     !onboardingState.isLoaded -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                     onboardingState.onboardingComplete -> HomeScreen(viewModel = homeViewModel)
                     else -> OnboardingScreen(
@@ -155,27 +173,6 @@ class MainActivity : ComponentActivity() {
                         onComplete = { onboardingViewModel.complete { } },
                         canAdvance = onboardingViewModel.canAdvance()
                     )
-                }
-
-                if (cityImportState.isImporting) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "Preparing offline city data…")
-                            Spacer(modifier = Modifier.height(16.dp))
-                            CircularProgressIndicator(
-                                progress = cityImportState.progress
-                            )
-                            if (cityImportState.total > 0) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "${cityImportState.current} / ${cityImportState.total}"
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }
