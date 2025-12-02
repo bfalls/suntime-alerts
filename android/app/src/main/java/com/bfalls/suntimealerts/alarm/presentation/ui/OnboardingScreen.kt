@@ -58,6 +58,7 @@ fun OnboardingScreen(
     onSunsetEnabledChanged: (Boolean) -> Unit,
     onSunriseOffsetChanged: (Int) -> Unit,
     onSunsetOffsetChanged: (Int) -> Unit,
+    onOpenPermissionSettings: () -> Unit,
     onCityQueryChanged: (String) -> Unit,
     onCitySelected: (City) -> Unit,
     onNext: () -> Unit,
@@ -118,6 +119,7 @@ fun OnboardingScreen(
                     OnboardingStep.LOCATION -> LocationStep(
                         state,
                         onLocationModeChanged,
+                        onOpenPermissionSettings,
                         onCityQueryChanged,
                         onCitySelected
                     )
@@ -142,6 +144,7 @@ private fun WelcomeStep() {
 private fun LocationStep(
     state: OnboardingState,
     onLocationModeChanged: (LocationMode) -> Unit,
+    onOpenPermissionSettings: () -> Unit,
     onCityQueryChanged: (String) -> Unit,
     onCitySelected: (City) -> Unit
 ) {
@@ -255,6 +258,15 @@ private fun LocationStep(
             when (val label = state.deviceNearestCityLabel) {
                 null -> Text("Finding nearest city…")
                 else -> Text("Nearest city: $label")
+            }
+
+            if (state.locationPermissionPermanentlyDenied) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Location permission is disabled. Open Settings to enable device location.")
+                    OutlinedButton(onClick = onOpenPermissionSettings) {
+                        Text("Open Settings")
+                    }
+                }
             }
         }
     }

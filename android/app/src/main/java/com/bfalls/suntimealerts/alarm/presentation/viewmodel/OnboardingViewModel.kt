@@ -21,6 +21,7 @@ data class OnboardingState(
     val isLoaded: Boolean = false,
     val onboardingComplete: Boolean = false,
     val locationMode: LocationMode = LocationMode.DEVICE,
+    val locationPermissionPermanentlyDenied: Boolean = false,
     val deviceNearestCityLabel: String? = null,
     val fixedLatitude: String = "",
     val fixedLongitude: String = "",
@@ -35,6 +36,8 @@ data class OnboardingState(
 )
 
 enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, ALARMS, SUMMARY }
+
+enum class PermissionRequestOrigin { AUTOMATIC, USER }
 
 class OnboardingViewModel(
     private val settingsStore: SettingsStore,
@@ -86,6 +89,39 @@ class OnboardingViewModel(
         )
         if (mode == LocationMode.DEVICE) {
             refreshDeviceNearestCity()
+        }
+    }
+
+    fun handleLocationPermissionResult(
+        granted: Boolean,
+        permanentlyDenied: Boolean,
+        origin: PermissionRequestOrigin
+    ) {
+        val current = _state.value
+
+        if (granted) {
+            _state.value = current.copy(locationPermissionPermanentlyDenied = false)
+            updateLocationMode(LocationMode.DEVICE)
+            return
+        }
+
+        val updated = current.copy(locationPermissionPermanentlyDenied = permanentlyDenied)
+        _state.value = updated
+
+        if (
+            !permanentlyDenied &&
+            !current.onboardingComplete &&
+            current.step == OnboardingStep.LOCATION &&
+            current.locationMode == LocationMode.DEVICE
+        ) {
+            _state.value = updated.copy(locationMode = LocationMode.FIXED)
+        }
+    }
+
+    fun clearLocationPermissionDenial() {
+        val current = _state.value
+        if (current.locationPermissionPermanentlyDenied) {
+            _state.value = current.copy(locationPermissionPermanentlyDenied = false)
         }
     }
 

@@ -31,6 +31,11 @@ class LocationService(private val application: Application) {
             Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
+        Log.d(
+            "LocationService",
+            "Permission check: fineGranted=$fineGranted coarseGranted=$coarseGranted"
+        )
+
         if (!fineGranted && !coarseGranted) {
             Log.w("LocationService", "No location permission; returning null")
             return null
