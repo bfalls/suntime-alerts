@@ -22,6 +22,7 @@ data class OnboardingState(
     val onboardingComplete: Boolean = false,
     val locationMode: LocationMode = LocationMode.DEVICE,
     val locationPermissionPermanentlyDenied: Boolean = false,
+    val locationPermissionDeniedAttempts: Int = 0,
     val deviceNearestCityLabel: String? = null,
     val fixedLatitude: String = "",
     val fixedLongitude: String = "",
@@ -83,6 +84,13 @@ class OnboardingViewModel(
     }
 
     fun updateLocationMode(mode: LocationMode) {
+        if (mode == LocationMode.DEVICE && _state.value.locationPermissionPermanentlyDenied) {
+            // The user has exhausted permission attempts; keep them in manual mode until
+            // they re-enable permissions via system settings and grant access.
+            _state.value = _state.value.copy(locationMode = LocationMode.FIXED)
+            return
+        }
+
         _state.value = _state.value.copy(
             locationMode = mode,
             deviceNearestCityLabel = if (mode == LocationMode.DEVICE) null else _state.value.deviceNearestCityLabel
@@ -100,16 +108,31 @@ class OnboardingViewModel(
         val current = _state.value
 
         if (granted) {
-            _state.value = current.copy(locationPermissionPermanentlyDenied = false)
+            _state.value = current.copy(
+                locationPermissionPermanentlyDenied = false,
+                locationPermissionDeniedAttempts = 0
+            )
             updateLocationMode(LocationMode.DEVICE)
             return
         }
 
-        val updated = current.copy(locationPermissionPermanentlyDenied = permanentlyDenied)
+        val updatedAttempts = current.locationPermissionDeniedAttempts + 1
+        val forcedManual = permanentlyDenied || updatedAttempts >= 2
+
+        val updated = current.copy(
+            locationPermissionPermanentlyDenied = forcedManual,
+            locationPermissionDeniedAttempts = updatedAttempts
+        )
         _state.value = updated
 
         if (
-            !permanentlyDenied &&
+            forcedManual &&
+            !current.onboardingComplete &&
+            current.step == OnboardingStep.LOCATION
+        ) {
+            _state.value = updated.copy(locationMode = LocationMode.FIXED)
+        } else if (
+            !forcedManual &&
             !current.onboardingComplete &&
             current.step == OnboardingStep.LOCATION &&
             current.locationMode == LocationMode.DEVICE
@@ -182,7 +205,7 @@ class OnboardingViewModel(
                         current.fixedLatitude.toDoubleOrNull() != null &&
                                 current.fixedLongitude.toDoubleOrNull() != null
                         )
-            } else true
+            } else current.deviceNearestCityLabel != null
 
             else -> true
         }

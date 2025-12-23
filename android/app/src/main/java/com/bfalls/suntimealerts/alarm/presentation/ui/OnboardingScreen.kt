@@ -159,6 +159,7 @@ private fun LocationStep(
                 SegmentedButton(
                     shape = SegmentedButtonDefaults.itemShape(index, options.size),
                     selected = state.locationMode == mode,
+                    enabled = !(mode == LocationMode.DEVICE && state.locationPermissionPermanentlyDenied),
                     onClick = { onLocationModeChanged(mode) },
                     icon = {
                         when (mode) {
@@ -175,6 +176,9 @@ private fun LocationStep(
                     label = { Text(label) }
                 )
             }
+        }
+        if (state.locationPermissionPermanentlyDenied) {
+            Text("Location permission was denied twice. Enter your location manually to continue.")
         }
         if (state.locationMode == LocationMode.FIXED) {
             OutlinedTextField(
