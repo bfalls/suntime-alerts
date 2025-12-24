@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
@@ -156,10 +157,22 @@ private fun LocationStep(
                 LocationMode.FIXED to "Manual"
             )
             options.forEachIndexed { index, (mode, label) ->
+                val disabledDeviceOption =
+                    mode == LocationMode.DEVICE && state.locationPermissionPermanentlyDenied
                 SegmentedButton(
+                    modifier = if (disabledDeviceOption) Modifier.alpha(0.6f) else Modifier,
                     shape = SegmentedButtonDefaults.itemShape(index, options.size),
                     selected = state.locationMode == mode,
-                    enabled = !(mode == LocationMode.DEVICE && state.locationPermissionPermanentlyDenied),
+                    enabled = !disabledDeviceOption,
+                    colors = if (disabledDeviceOption) {
+                        SegmentedButtonDefaults.colors(
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            disabledBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    } else {
+                        SegmentedButtonDefaults.colors()
+                    },
                     onClick = { onLocationModeChanged(mode) },
                     icon = {
                         when (mode) {
