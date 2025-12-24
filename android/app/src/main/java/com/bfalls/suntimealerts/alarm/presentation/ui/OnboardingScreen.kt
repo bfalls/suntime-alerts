@@ -164,15 +164,7 @@ private fun LocationStep(
                     shape = SegmentedButtonDefaults.itemShape(index, options.size),
                     selected = state.locationMode == mode,
                     enabled = !disabledDeviceOption,
-                    colors = if (disabledDeviceOption) {
-                        SegmentedButtonDefaults.colors(
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                            disabledBorderColor = MaterialTheme.colorScheme.outlineVariant
-                        )
-                    } else {
-                        SegmentedButtonDefaults.colors()
-                    },
+                    colors = SegmentedButtonDefaults.colors(),
                     onClick = { onLocationModeChanged(mode) },
                     icon = {
                         when (mode) {

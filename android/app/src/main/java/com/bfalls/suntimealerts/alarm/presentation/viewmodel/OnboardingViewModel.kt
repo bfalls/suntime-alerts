@@ -4,8 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.bfalls.suntimealerts.alarm.data.LocationService
-import com.bfalls.suntimealerts.alarm.data.SettingsStore
+import com.bfalls.suntimealerts.alarm.data.LocationProvider
+import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
@@ -41,9 +41,9 @@ enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, ALARMS, SUMMARY }
 enum class PermissionRequestOrigin { AUTOMATIC, USER }
 
 class OnboardingViewModel(
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsRepository,
     private val cityRepository: CityRepository,
-    private val locationService: LocationService
+    private val locationService: LocationProvider
 ) : ViewModel() {
     private val _state = MutableStateFlow(OnboardingState())
     val state: StateFlow<OnboardingState> = _state
@@ -288,9 +288,9 @@ class OnboardingViewModel(
 }
 
 class OnboardingViewModelFactory(
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsRepository,
     private val cityRepository: CityRepository,
-    private val locationService: LocationService
+    private val locationService: LocationProvider
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {

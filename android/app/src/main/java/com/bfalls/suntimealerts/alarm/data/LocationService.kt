@@ -1,26 +1,29 @@
 package com.bfalls.suntimealerts.alarm.data
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Application
-import android.location.Location
-import android.Manifest
 import android.content.pm.PackageManager
+import android.location.Location
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
-import androidx.core.content.ContextCompat
 import kotlinx.coroutines.tasks.await
 
+interface LocationProvider {
+    suspend fun currentCoordinate(): Coordinate?
+}
 
-class LocationService(private val application: Application) {
+class LocationService(private val application: Application) : LocationProvider {
     private val client: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(application)
 
     @SuppressLint("MissingPermission")
-    suspend fun currentCoordinate(): Coordinate? {
+    override suspend fun currentCoordinate(): Coordinate? {
         // Fast check: if we don't have location permission, bail out immediately
         val fineGranted = ContextCompat.checkSelfPermission(
             application,

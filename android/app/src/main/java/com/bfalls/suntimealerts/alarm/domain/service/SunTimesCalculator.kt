@@ -85,7 +85,7 @@ class SunTimesCalculator {
         val declRad = Math.toRadians(declination)
         val solarZenith = Math.toRadians(90.833)
         val cosH = (cos(solarZenith) - sin(latRad) * sin(declRad)) / (cos(latRad) * cos(declRad))
-        return acos(cosH)
+        return Math.toDegrees(acos(cosH))
     }
 
     private fun fractionalDayToDate(date: LocalDate, fraction: Double, zoneId: ZoneId): ZonedDateTime? {

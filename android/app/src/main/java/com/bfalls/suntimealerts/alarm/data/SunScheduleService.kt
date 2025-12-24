@@ -9,12 +9,16 @@ import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import java.time.LocalDate
 import java.time.ZoneId
 
+interface SunScheduler {
+    suspend fun schedule(coordinate: Coordinate, zoneId: ZoneId)
+}
+
 class SunScheduleService(
     private val calculator: SunTimesCalculator,
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsRepository,
     private val notificationScheduler: NotificationScheduler
-) {
-    suspend fun schedule(coordinate: Coordinate, zoneId: ZoneId) {
+) : SunScheduler {
+    override suspend fun schedule(coordinate: Coordinate, zoneId: ZoneId) {
         val settings = settingsStore.load()
         val today = LocalDate.now(zoneId)
         val dates = listOf(today, today.plusDays(1))

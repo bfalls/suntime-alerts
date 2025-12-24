@@ -1,23 +1,26 @@
 package com.bfalls.suntimealerts.alarm.data
 
+import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import android.content.Context
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
-import com.bfalls.suntimealerts.alarm.domain.model.*
 import kotlinx.coroutines.flow.first
-import kotlin.text.get
+
+interface SettingsRepository {
+    suspend fun load(): UserSettings
+    suspend fun save(settings: UserSettings)
+}
 
 private val Context.dataStore by preferencesDataStore("sunriseSunset")
 
-class SettingsStore(private val context: Context) {
+class SettingsStore(private val context: Context) : SettingsRepository {
     private val sunriseEnabled = booleanPreferencesKey("sunrise_enabled")
     private val sunriseOffset = intPreferencesKey("sunrise_offset")
     private val sunsetEnabled = booleanPreferencesKey("sunset_enabled")
@@ -27,7 +30,7 @@ class SettingsStore(private val context: Context) {
     private val fixedLon = doublePreferencesKey("fixed_lon")
     private val onboarding = booleanPreferencesKey("onboarding")
 
-    suspend fun load(): UserSettings {
+    override suspend fun load(): UserSettings {
         val prefs = context.dataStore.data.first()
         val sunriseConfig = SunAlarmConfig(
             prefs[sunriseEnabled] ?: true,
@@ -58,7 +61,7 @@ class SettingsStore(private val context: Context) {
         )
     }
 
-    suspend fun save(settings: UserSettings) {
+    override suspend fun save(settings: UserSettings) {
         context.dataStore.edit { prefs ->
             prefs[sunriseEnabled] = settings.sunriseConfig.enabled
             prefs[sunriseOffset] = settings.sunriseConfig.offsetMinutes
