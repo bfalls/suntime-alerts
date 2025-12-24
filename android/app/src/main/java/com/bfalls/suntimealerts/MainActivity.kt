@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -17,13 +18,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bfalls.suntimealerts.alarm.data.LocationService
 import com.bfalls.suntimealerts.alarm.data.SettingsStore
@@ -33,6 +42,7 @@ import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.presentation.ui.HomeScreen
 import com.bfalls.suntimealerts.alarm.presentation.ui.OnboardingScreen
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
+import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingStep
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingViewModel
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingViewModelFactory
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.PermissionRequestOrigin
@@ -42,13 +52,6 @@ import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
 import com.bfalls.suntimealerts.utils.hasLocationPermission
-import androidx.compose.runtime.LaunchedEffect
-import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingStep
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import androidx.core.app.ActivityCompat
-import android.provider.Settings
 
 
 class MainActivity : ComponentActivity() {
@@ -72,6 +75,7 @@ class MainActivity : ComponentActivity() {
             )
             val cityImportState by cityImportViewModel.state.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
+            val lifecycleOwner = LocalLifecycleOwner.current
             val locationPermissionLauncher =
                 rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -106,11 +110,33 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+            DisposableEffect(
+                lifecycleOwner,
+                onboardingState.locationPermissionPermanentlyDenied
+            ) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (
+                        event == Lifecycle.Event.ON_RESUME &&
+                        onboardingState.locationPermissionPermanentlyDenied &&
+                        hasLocationPermission(context)
+                    ) {
+                        onboardingViewModel.clearLocationPermissionDenial()
+                    }
+                }
+
+                lifecycleOwner.lifecycle.addObserver(observer)
+
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
+            }
+
             LaunchedEffect(
                 onboardingState.isLoaded,
                 onboardingState.step,
                 onboardingState.locationMode,
                 onboardingState.deviceNearestCityLabel,
+                onboardingState.locationPermissionPermanentlyDenied,
                 permissionRequestOrigin
             ) {
                 // If onboarding is showing the LOCATION step and is in DEVICE mode,

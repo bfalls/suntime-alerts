@@ -58,6 +58,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
     implementation(libs.gson)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
