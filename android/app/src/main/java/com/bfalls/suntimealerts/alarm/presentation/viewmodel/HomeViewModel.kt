@@ -7,55 +7,169 @@ import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.data.SunScheduler
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
+import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
+import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 class HomeViewModel(
     private val locationService: LocationProvider,
     private val settingsStore: SettingsRepository,
-    private val scheduleService: SunScheduler
+    private val scheduleService: SunScheduler,
+    private val sunTimesCalculator: SunTimesCalculator
 ) : ViewModel() {
 
     data class State(
-        val sunrise: String? = null,
-        val sunset: String? = null,
-        val sunriseEnabled: Boolean = true,
-        val sunsetEnabled: Boolean = false
+        val isLoading: Boolean = true,
+        val sunriseTime: ZonedDateTime? = null,
+        val sunsetTime: ZonedDateTime? = null,
+        val sunriseTimeText: String? = null,
+        val sunsetTimeText: String? = null,
+        val sunriseAlarms: List<SunAlarm> = emptyList(),
+        val sunsetAlarms: List<SunAlarm> = emptyList(),
+        val error: String? = null
     )
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state
 
+    private var cachedSettings: UserSettings? = null
+
     init {
-        viewModelScope.launch { load() }
+        viewModelScope.launch { loadState() }
     }
 
-    private suspend fun load() {
-        val settings = settingsStore.load()
-        _state.value = _state.value.copy(
-            sunriseEnabled = settings.sunriseConfig.enabled,
-            sunsetEnabled = settings.sunsetConfig.enabled
-        )
+    fun addAlarm(
+        type: SunEventType,
+        offsetMinutes: Int,
+        label: String,
+        enabled: Boolean
+    ) {
+        viewModelScope.launch {
+            val current = _state.value
+            val newAlarm = SunAlarm(
+                id = UUID.randomUUID().toString(),
+                type = type,
+                offsetMinutes = offsetMinutes,
+                label = label,
+                enabled = enabled
+            )
+            persistAlarms(current.allAlarms() + newAlarm)
+        }
     }
 
-    fun toggleSunrise(enabled: Boolean) {
-        _state.value = _state.value.copy(sunriseEnabled = enabled)
+    fun updateAlarm(alarm: SunAlarm) {
+        viewModelScope.launch {
+            val updated = _state.value.allAlarms().map {
+                if (it.id == alarm.id) alarm else it
+            }
+            persistAlarms(updated)
+        }
     }
 
-    fun toggleSunset(enabled: Boolean) {
-        _state.value = _state.value.copy(sunsetEnabled = enabled)
+    fun toggleAlarmEnabled(id: String, enabled: Boolean) {
+        viewModelScope.launch {
+            val updated = _state.value.allAlarms().map {
+                if (it.id == id) it.copy(enabled = enabled) else it
+            }
+            persistAlarms(updated)
+        }
+    }
+
+    fun deleteAlarm(id: String) {
+        viewModelScope.launch {
+            val updated = _state.value.allAlarms().filterNot { it.id == id }
+            persistAlarms(updated)
+        }
+    }
+
+    fun duplicateAlarm(id: String) {
+        viewModelScope.launch {
+            val current = _state.value.allAlarms()
+            val toCopy = current.firstOrNull { it.id == id } ?: return@launch
+            val copy = toCopy.copy(
+                id = UUID.randomUUID().toString(),
+                label = if (toCopy.label.isNotBlank()) "${toCopy.label} (copy)" else toCopy.label
+            )
+            persistAlarms(current + copy)
+        }
+    }
+
+    fun restoreAlarm(alarm: SunAlarm) {
+        viewModelScope.launch {
+            val existing = _state.value.allAlarms().filterNot { it.id == alarm.id }
+            persistAlarms(existing + alarm)
+        }
     }
 
     fun reschedule() {
         viewModelScope.launch {
-            val settings = settingsStore.load()
-            val coordinate = when (settings.locationMode) {
-                LocationMode.FIXED -> settings.fixedLocation ?: locationService.currentCoordinate()
-                LocationMode.DEVICE -> locationService.currentCoordinate()
-            } ?: Coordinate(0.0, 0.0)
-            scheduleService.schedule(coordinate, ZoneId.systemDefault())
+            scheduleForCurrentSettings()
         }
     }
+
+    private suspend fun loadState() {
+        val settings = settingsStore.load()
+        cachedSettings = settings
+        val alarms = settings.alarms.ifEmpty { settingsStore.loadAlarms() }
+        if (settings.alarms.isEmpty()) {
+            settingsStore.saveAlarms(alarms)
+        }
+        val zoneId = ZoneId.systemDefault()
+        val coordinate = resolveCoordinate(settings)
+        val sunTimes = coordinate?.let {
+            sunTimesCalculator.calculateSunTimes(LocalDate.now(zoneId), it, zoneId)
+        }
+        _state.value = State(
+            isLoading = false,
+            sunriseTime = sunTimes?.sunrise,
+            sunsetTime = sunTimes?.sunset,
+            sunriseTimeText = formatTime(sunTimes?.sunrise, settings.timeFormat24h),
+            sunsetTimeText = formatTime(sunTimes?.sunset, settings.timeFormat24h),
+            sunriseAlarms = alarms.filter { it.type == SunEventType.SUNRISE }.sortedBy { it.offsetMinutes },
+            sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes },
+            error = if (coordinate == null) "Location unavailable" else null
+        )
+
+        scheduleForCurrentSettings()
+    }
+
+    private fun formatTime(dateTime: ZonedDateTime?, use24h: Boolean): String? {
+        dateTime ?: return null
+        val pattern = if (use24h) "HH:mm" else "h:mm a"
+        return dateTime.format(DateTimeFormatter.ofPattern(pattern))
+    }
+
+    private suspend fun persistAlarms(alarms: List<SunAlarm>) {
+        settingsStore.saveAlarms(alarms)
+        cachedSettings = (cachedSettings ?: settingsStore.load()).copy(alarms = alarms)
+        _state.value = _state.value.copy(
+            sunriseAlarms = alarms.filter { it.type == SunEventType.SUNRISE }.sortedBy { it.offsetMinutes },
+            sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes }
+        )
+        scheduleForCurrentSettings()
+    }
+
+    private suspend fun scheduleForCurrentSettings() {
+        val settings = cachedSettings ?: settingsStore.load()
+        val coordinate = resolveCoordinate(settings) ?: Coordinate(0.0, 0.0)
+        scheduleService.schedule(coordinate, ZoneId.systemDefault())
+    }
+
+    private suspend fun resolveCoordinate(settings: UserSettings): Coordinate? {
+        return when (settings.locationMode) {
+            LocationMode.FIXED -> settings.fixedLocation ?: locationService.currentCoordinate()
+            LocationMode.DEVICE -> locationService.currentCoordinate()
+        }
+    }
+
+    private fun State.allAlarms(): List<SunAlarm> = sunriseAlarms + sunsetAlarms
 }

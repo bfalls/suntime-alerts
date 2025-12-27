@@ -1,37 +1,570 @@
 package com.bfalls.suntimealerts.alarm.presentation.ui
 
+import android.widget.NumberPicker
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
+import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
+import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SunXY
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
+import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import kotlin.math.abs
+import kotlin.random.Random
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(viewModel: HomeViewModel) {
     val state by viewModel.state.collectAsState()
-    Scaffold { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-        ) {
-            Text(text = "Suntime Alerts")
-            Text(text = "Sunrise alarm")
-            Switch(checked = state.sunriseEnabled, onCheckedChange = viewModel::toggleSunrise)
-            Text(text = "Sunset alarm")
-            Switch(checked = state.sunsetEnabled, onCheckedChange = viewModel::toggleSunset)
-            Button(onClick = viewModel::reschedule) {
-                Text("Recompute & Reschedule")
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var editingAlarm by remember { mutableStateOf<SunAlarm?>(null) }
+    var sheetType by remember { mutableStateOf(SunEventType.SUNRISE) }
+    var showSheet by remember { mutableStateOf(false) }
+
+    val openSheet: (SunAlarm?, SunEventType) -> Unit = { alarm, type ->
+        editingAlarm = alarm
+        sheetType = type
+        showSheet = true
+    }
+
+    Scaffold(
+        topBar = {
+            SunTopBar(
+                sunrise = state.sunriseTime,
+                sunset = state.sunsetTime,
+                onAdd = { openSheet(null, SunEventType.SUNRISE) }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { openSheet(null, SunEventType.SUNRISE) }) {
+                Icon(Icons.Default.Add, contentDescription = "Add alarm")
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Loading…")
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                AlarmSection(
+                    title = "Sunrise",
+                    timeText = state.sunriseTimeText,
+                    alarms = state.sunriseAlarms,
+                    onAdd = { openSheet(null, SunEventType.SUNRISE) },
+                    onToggle = { alarm, enabled -> viewModel.toggleAlarmEnabled(alarm.id, enabled) },
+                    onEdit = { openSheet(it, it.type) },
+                    onDelete = { alarm ->
+                        viewModel.deleteAlarm(alarm.id)
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Sunrise alarm deleted",
+                                actionLabel = "Undo"
+                            )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                viewModel.restoreAlarm(alarm)
+                            }
+                        }
+                    },
+                    onDuplicate = { viewModel.duplicateAlarm(it.id) }
+                )
+                AlarmSection(
+                    title = "Sunset",
+                    timeText = state.sunsetTimeText,
+                    alarms = state.sunsetAlarms,
+                    onAdd = { openSheet(null, SunEventType.SUNSET) },
+                    onToggle = { alarm, enabled -> viewModel.toggleAlarmEnabled(alarm.id, enabled) },
+                    onEdit = { openSheet(it, it.type) },
+                    onDelete = { alarm ->
+                        viewModel.deleteAlarm(alarm.id)
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Sunset alarm deleted",
+                                actionLabel = "Undo"
+                            )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                viewModel.restoreAlarm(alarm)
+                            }
+                        }
+                    },
+                    onDuplicate = { viewModel.duplicateAlarm(it.id) }
+                )
             }
         }
+    }
+
+    if (showSheet) {
+        AlarmEditorSheet(
+            initialAlarm = editingAlarm,
+            defaultType = sheetType,
+            onDismiss = { showSheet = false },
+            onSave = { alarm ->
+                if (editingAlarm == null) {
+                    viewModel.addAlarm(alarm.type, alarm.offsetMinutes, alarm.label, alarm.enabled)
+                } else {
+                    viewModel.updateAlarm(alarm)
+                }
+                showSheet = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.AlarmSection(
+    title: String,
+    timeText: String?,
+    alarms: List<SunAlarm>,
+    onAdd: () -> Unit,
+    onToggle: (SunAlarm, Boolean) -> Unit,
+    onEdit: (SunAlarm) -> Unit,
+    onDelete: (SunAlarm) -> Unit,
+    onDuplicate: (SunAlarm) -> Unit
+) {
+    val listHeight = LocalConfiguration.current.screenHeightDp.dp / 2
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column {
+                Text(text = title, fontWeight = FontWeight.Bold)
+                timeText?.let { Text(text = it, color = Color.Gray) }
+            }
+            TextButton(onClick = onAdd) {
+                Text(text = "Add")
+            }
+        }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 120.dp, max = listHeight)
+        ) {
+            items(alarms, key = { it.id }) { alarm ->
+                AlarmRow(
+                    alarm = alarm,
+                    onToggle = { enabled -> onToggle(alarm, enabled) },
+                    onEdit = { onEdit(alarm) },
+                    onDelete = { onDelete(alarm) },
+                    onDuplicate = { onDuplicate(alarm) }
+                )
+            }
+            if (alarms.isEmpty()) {
+                item {
+                    TextButton(onClick = onAdd) {
+                        Text("No alarms yet. Add one?")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlarmRow(
+    alarm: SunAlarm,
+    onToggle: (Boolean) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEdit() }
+            .padding(vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.align(Alignment.CenterStart)) {
+            Text(
+                text = formatOffset(alarm.offsetMinutes),
+                fontWeight = FontWeight.Bold
+            )
+            if (alarm.label.isNotBlank()) {
+                Text(
+                    text = alarm.label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onDuplicate) {
+                Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate alarm")
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete alarm")
+            }
+            Switch(
+                checked = alarm.enabled,
+                onCheckedChange = onToggle
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AlarmEditorSheet(
+    initialAlarm: SunAlarm?,
+    defaultType: SunEventType,
+    onDismiss: () -> Unit,
+    onSave: (SunAlarm) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var type by rememberSaveable { mutableStateOf(initialAlarm?.type ?: defaultType) }
+    var isAfter by rememberSaveable { mutableStateOf((initialAlarm?.offsetMinutes ?: 0) >= 0) }
+    var hours by rememberSaveable { mutableStateOf(abs(initialAlarm?.offsetMinutes ?: 0) / 60) }
+    var minutes by rememberSaveable { mutableStateOf(abs(initialAlarm?.offsetMinutes ?: 0) % 60) }
+    var label by rememberSaveable { mutableStateOf(initialAlarm?.label ?: "") }
+    var enabled by rememberSaveable { mutableStateOf(initialAlarm?.enabled ?: true) }
+
+    LaunchedEffect(initialAlarm?.id, defaultType) {
+        type = initialAlarm?.type ?: defaultType
+        val offset = initialAlarm?.offsetMinutes ?: 0
+        isAfter = offset >= 0
+        hours = abs(offset) / 60
+        minutes = abs(offset) % 60
+        label = initialAlarm?.label ?: ""
+        enabled = initialAlarm?.enabled ?: true
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(text = if (initialAlarm == null) "Add alarm" else "Edit alarm", fontWeight = FontWeight.Bold)
+            Text(text = "Event")
+            SingleChoiceSegmentedButtonRow {
+                SegmentedButton(
+                    selected = type == SunEventType.SUNRISE,
+                    onClick = { type = SunEventType.SUNRISE },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) {
+                    Text("Sunrise")
+                }
+                SegmentedButton(
+                    selected = type == SunEventType.SUNSET,
+                    onClick = { type = SunEventType.SUNSET },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) {
+                    Text("Sunset")
+                }
+            }
+            Text(text = "Timing")
+            SingleChoiceSegmentedButtonRow {
+                SegmentedButton(
+                    selected = !isAfter,
+                    onClick = { isAfter = false },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) {
+                    Text("Before")
+                }
+                SegmentedButton(
+                    selected = isAfter,
+                    onClick = { isAfter = true },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) {
+                    Text("After")
+                }
+            }
+            OffsetPicker(
+                hours = hours,
+                minutes = minutes,
+                onHoursChanged = { hours = it },
+                onMinutesChanged = { minutes = it }
+            )
+            TextField(
+                value = label,
+                onValueChange = { label = it },
+                label = { Text("Label") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Enabled")
+                Switch(checked = enabled, onCheckedChange = { enabled = it })
+            }
+            Button(
+                onClick = {
+                    val totalMinutes = hours * 60 + minutes
+                    val offset = if (isAfter) totalMinutes else -totalMinutes
+                    val updated = initialAlarm?.copy(
+                        type = type,
+                        offsetMinutes = offset,
+                        label = label,
+                        enabled = enabled
+                    ) ?: SunAlarm(
+                        type = type,
+                        offsetMinutes = offset,
+                        label = label,
+                        enabled = enabled
+                    )
+                    onSave(updated)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Save")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun OffsetPicker(
+    hours: Int,
+    minutes: Int,
+    onHoursChanged: (Int) -> Unit,
+    onMinutesChanged: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        NumberPickerColumn(
+            label = "Hours",
+            value = hours,
+            range = 0..23,
+            onValueChange = onHoursChanged
+        )
+        NumberPickerColumn(
+            label = "Minutes",
+            value = minutes,
+            range = 0..59,
+            onValueChange = onMinutesChanged
+        )
+    }
+}
+
+@Composable
+private fun NumberPickerColumn(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onValueChange: (Int) -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, fontWeight = FontWeight.Bold)
+        AndroidView(
+            factory = { context ->
+                NumberPicker(context).apply {
+                    minValue = range.first
+                    maxValue = range.last
+                    setOnValueChangedListener { _, _, newVal -> onValueChange(newVal) }
+                }
+            },
+            update = {
+                if (it.value != value) {
+                    it.value = value.coerceIn(range)
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SunTopBar(
+    sunrise: ZonedDateTime?,
+    sunset: ZonedDateTime?,
+    onAdd: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+    ) {
+        SunAppBarBackground(
+            sunrise = sunrise,
+            sunset = sunset,
+            modifier = Modifier
+                .matchParentSize()
+                .testTag("sun_appbar_background")
+        )
+        TopAppBar(
+            title = { Text("Sun Alarms") },
+            actions = {
+                IconButton(onClick = onAdd) {
+                    Icon(Icons.Default.Add, contentDescription = "Add alarm")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent,
+                titleContentColor = Color.White,
+                actionIconContentColor = Color.White
+            )
+        )
+    }
+}
+
+@Composable
+private fun SunAppBarBackground(
+    sunrise: ZonedDateTime?,
+    sunset: ZonedDateTime?,
+    modifier: Modifier = Modifier
+) {
+    val zone = sunrise?.zone ?: sunset?.zone ?: ZoneId.systemDefault()
+    val now = ZonedDateTime.now(zone)
+    Canvas(modifier = modifier) {
+        val dayLengthMinutes = if (sunrise != null && sunset != null) {
+            Duration.between(sunrise, sunset).toMinutes()
+        } else {
+            12L * 60
+        }
+        val arcScale = SunArcPositionCalculator.computeArcScale(dayLengthMinutes)
+        val horizonY = size.height * 0.75f
+        val arcHeight = size.height * 0.45f * arcScale.toFloat()
+        val t = SunArcPositionCalculator.computeSunT(now, sunrise, sunset)
+        val sunPosition: SunXY = SunArcPositionCalculator.computeSunXY(
+            t = t,
+            width = size.width,
+            horizonY = horizonY,
+            arcHeight = arcHeight,
+            horizontalPadding = size.width * 0.1f
+        )
+        val isDay = sunPosition.isDay && sunrise != null && sunset != null
+        val gradient = if (isDay) {
+            Brush.verticalGradient(
+                listOf(
+                    Color(0xFF64B5F6),
+                    Color(0xFFBBDEFB)
+                )
+            )
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color(0xFF0D1B2A),
+                    Color(0xFF001219)
+                )
+            )
+        }
+        drawRect(brush = gradient, size = size)
+
+        if (!isDay) {
+            drawStars(horizonY, now.toLocalDate().toEpochDay())
+        }
+
+        drawLine(
+            color = Color.White.copy(alpha = 0.25f),
+            start = Offset(0f, horizonY),
+            end = Offset(size.width, horizonY),
+            strokeWidth = 2f
+        )
+
+        if (isDay) {
+            drawCircle(
+                color = Color(0xFFFFD54F),
+                radius = size.minDimension * 0.06f,
+                center = Offset(sunPosition.x, sunPosition.y)
+            )
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStars(
+    horizonY: Float,
+    seed: Long
+) {
+    val random = Random(seed)
+    repeat(60) {
+        val x = random.nextFloat() * size.width
+        val y = random.nextFloat() * (horizonY * 0.9f)
+        val radius = (random.nextDouble(1.0, 3.0)).toFloat()
+        drawCircle(
+            color = Color.White.copy(alpha = random.nextFloat().coerceIn(0.3f, 0.8f)),
+            radius = radius,
+            center = Offset(x, y)
+        )
     }
 }

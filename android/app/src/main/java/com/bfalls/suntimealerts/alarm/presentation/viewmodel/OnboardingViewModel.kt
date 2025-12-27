@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.bfalls.suntimealerts.alarm.data.LocationProvider
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
+import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.cities.data.City
@@ -214,23 +215,44 @@ class OnboardingViewModel(
     fun complete(onFinished: () -> Unit) {
         viewModelScope.launch {
             var settings = settingsStore.load()
+            val existingAlarmsByType = settings.alarms.associateBy { it.type }
+            val onboardingState = _state.value
+            val updatedAlarms = listOf(
+                SunAlarm(
+                    id = existingAlarmsByType[SunEventType.SUNRISE]?.id ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNRISE }?.id
+                    ?: java.util.UUID.randomUUID().toString(),
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = onboardingState.sunriseOffsetMinutes,
+                    label = existingAlarmsByType[SunEventType.SUNRISE]?.label ?: "Sunrise",
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled
+                ),
+                SunAlarm(
+                    id = existingAlarmsByType[SunEventType.SUNSET]?.id ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNSET }?.id
+                    ?: java.util.UUID.randomUUID().toString(),
+                    type = SunEventType.SUNSET,
+                    offsetMinutes = onboardingState.sunsetOffsetMinutes,
+                    label = existingAlarmsByType[SunEventType.SUNSET]?.label ?: "Sunset",
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled
+                )
+            )
             settings = settings.copy(
                 locationMode = if (_state.value.locationMode == LocationMode.FIXED) LocationMode.FIXED else LocationMode.DEVICE,
                 sunriseConfig = SunAlarmConfig(
-                    enabled = _state.value.notificationsEnabled && _state.value.sunriseEnabled,
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled,
                     eventType = SunEventType.SUNRISE,
-                    offsetMinutes = _state.value.sunriseOffsetMinutes
+                    offsetMinutes = onboardingState.sunriseOffsetMinutes
                 ),
                 sunsetConfig = SunAlarmConfig(
-                    enabled = _state.value.notificationsEnabled && _state.value.sunsetEnabled,
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled,
                     eventType = SunEventType.SUNSET,
-                    offsetMinutes = _state.value.sunsetOffsetMinutes
+                    offsetMinutes = onboardingState.sunsetOffsetMinutes
                 ),
-                onboardingComplete = true
+                onboardingComplete = true,
+                alarms = updatedAlarms
             )
             if (settings.locationMode == LocationMode.FIXED) {
-                val lat = _state.value.fixedLatitude.toDoubleOrNull() ?: 0.0
-                val lon = _state.value.fixedLongitude.toDoubleOrNull() ?: 0.0
+                val lat = onboardingState.fixedLatitude.toDoubleOrNull() ?: 0.0
+                val lon = onboardingState.fixedLongitude.toDoubleOrNull() ?: 0.0
                 settings = settings.copy(
                     fixedLocation = com.bfalls.suntimealerts.alarm.domain.model.Coordinate(
                         lat,
