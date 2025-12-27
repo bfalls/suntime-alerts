@@ -2,8 +2,6 @@ package com.bfalls.suntimealerts.alarm.domain.model
 
 data class Coordinate(val latitude: Double, val longitude: Double)
 
-enum class SunEventType { SUNRISE, SUNSET }
-
 data class SunEvent(
     val dateEpochMillis: Long,
     val type: SunEventType,
@@ -28,5 +26,6 @@ data class UserSettings(
     val sunriseConfig: SunAlarmConfig,
     val sunsetConfig: SunAlarmConfig,
     val timeFormat24h: Boolean,
-    val onboardingComplete: Boolean
+    val onboardingComplete: Boolean,
+    val alarms: List<SunAlarm> = emptyList()
 )

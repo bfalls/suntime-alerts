@@ -63,9 +63,10 @@ class MainActivity : ComponentActivity() {
             val settingsStore = remember { SettingsStore(applicationContext) }
             val locationService = remember { LocationService(application) }
             val notificationScheduler = remember { NotificationScheduler(applicationContext) }
-            val scheduleService = remember { SunScheduleService(SunTimesCalculator(), settingsStore, notificationScheduler) }
+            val sunTimesCalculator = remember { SunTimesCalculator() }
+            val scheduleService = remember { SunScheduleService(sunTimesCalculator, settingsStore, notificationScheduler) }
             val cityRepository = remember { CityRepository(applicationContext) }
-            val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService) }
+            val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService, sunTimesCalculator) }
             val onboardingViewModel: OnboardingViewModel = viewModel(
                 factory = OnboardingViewModelFactory(settingsStore, cityRepository, locationService)
             )

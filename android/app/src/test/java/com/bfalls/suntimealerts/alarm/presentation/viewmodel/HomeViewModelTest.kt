@@ -6,9 +6,11 @@ import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.data.SunScheduler
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
+import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -32,27 +34,44 @@ class HomeViewModelTest {
             sunriseConfig = SunAlarmConfig(enabled = true, eventType = SunEventType.SUNRISE, offsetMinutes = 0),
             sunsetConfig = SunAlarmConfig(enabled = false, eventType = SunEventType.SUNSET, offsetMinutes = 0),
             timeFormat24h = true,
-            onboardingComplete = true
+            onboardingComplete = true,
+            alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Morning",
+                    enabled = true
+                )
+            )
         )
-        val settingsRepo = FakeSettingsRepository(settings)
+        val settingsRepo = FakeSettingsRepository(settings, settings.alarms)
         val locationProvider = RecordingLocationProvider()
         val scheduler = RecordingScheduler()
 
-        val viewModel = HomeViewModel(locationProvider, settingsRepo, scheduler)
+        val viewModel = HomeViewModel(locationProvider, settingsRepo, scheduler, SunTimesCalculator())
 
         advanceUntilIdle()
         viewModel.reschedule()
         advanceUntilIdle()
 
-        assertEquals(listOf(fixedCoordinate), scheduler.receivedCoordinates)
+        assertEquals(listOf(fixedCoordinate, fixedCoordinate), scheduler.receivedCoordinates)
         assertEquals(0, locationProvider.requestCount)
     }
 
     private class FakeSettingsRepository(
-        private val settings: UserSettings
+        private var settings: UserSettings,
+        private var alarms: List<SunAlarm>
     ) : SettingsRepository {
-        override suspend fun load(): UserSettings = settings
-        override suspend fun save(settings: UserSettings) = Unit
+        override suspend fun load(): UserSettings = settings.copy(alarms = alarms)
+        override suspend fun save(settings: UserSettings) {
+            this.settings = settings
+        }
+
+        override suspend fun loadAlarms(): List<SunAlarm> = alarms
+
+        override suspend fun saveAlarms(alarms: List<SunAlarm>) {
+            this.alarms = alarms
+        }
     }
 
     private class RecordingLocationProvider(
