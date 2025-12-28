@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  android-tests:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+      ANDROID_HOME: ${{ runner.temp }}/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl unzip git \
+            openjdk-17-jdk
+
+      - name: Set up Android SDK
+        run: |
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "${{ github.workspace }}/android/local.properties"
+
+          if [[ ! -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]]; then
+            CDT_ZIP="/tmp/commandlinetools.zip"
+            curl -fsSL -o "$CDT_ZIP" "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+            rm -rf "$ANDROID_SDK_ROOT/cmdline-tools/latest" "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools"
+            unzip -q "$CDT_ZIP" -d "$ANDROID_SDK_ROOT/cmdline-tools"
+            mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          fi
+
+          set +o pipefail
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null
+          set -o pipefail
+
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x android/gradlew
+
+      - name: Run Android unit tests
+        working-directory: android
+        run: |
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          ./gradlew test
