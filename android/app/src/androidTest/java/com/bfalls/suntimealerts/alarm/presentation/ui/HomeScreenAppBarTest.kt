@@ -2,8 +2,11 @@ package com.bfalls.suntimealerts.alarm.presentation.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
@@ -72,5 +75,46 @@ class HomeScreenAppBarTest {
         composeTestRule.onNodeWithText("Sunset").assertExists()
         composeTestRule.onNodeWithText(formatOffset(30)).assertExists()
         composeTestRule.onNodeWithText(formatOffset(-15)).assertExists()
+    }
+
+    @Test
+    fun addSheetShowsOffsetControlsAndCanCancel() {
+        val sunrise = ZonedDateTime.of(2024, 6, 1, 6, 0, 0, 0, ZoneId.of("UTC"))
+        val sunset = ZonedDateTime.of(2024, 6, 1, 20, 0, 0, 0, ZoneId.of("UTC"))
+        val state = HomeViewModel.State(
+            isLoading = false,
+            sunriseTime = sunrise,
+            sunsetTime = sunset,
+            sunriseTimeText = "06:00",
+            sunsetTimeText = "20:00",
+            sunriseAlarms = emptyList(),
+            sunsetAlarms = emptyList(),
+            error = null
+        )
+
+        composeTestRule.setContent {
+            SuntimeAlertsTheme {
+                HomeScreenContent(
+                    state = state,
+                    onAddAlarm = { _, _, _, _ -> },
+                    onUpdateAlarm = {},
+                    onToggleAlarmEnabled = { _, _ -> },
+                    onDeleteAlarm = {},
+                    onDuplicateAlarm = {},
+                    onRestoreAlarm = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Add alarm").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Before").assertExists()
+        composeTestRule.onNodeWithText("After").assertExists()
+        composeTestRule.onNodeWithText("Hours").assertExists()
+        composeTestRule.onNodeWithText("Minutes").assertExists()
+        composeTestRule.onNodeWithText("Cancel").performClick()
+
+        composeTestRule.onNodeWithText("Label").assertDoesNotExist()
     }
 }

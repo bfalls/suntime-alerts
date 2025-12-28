@@ -396,26 +396,37 @@ private fun AlarmEditorSheet(
                 Text("Enabled")
                 Switch(checked = enabled, onCheckedChange = { enabled = it })
             }
-            Button(
-                onClick = {
-                    val totalMinutes = hours * 60 + minutes
-                    val offset = if (isAfter) totalMinutes else -totalMinutes
-                    val updated = initialAlarm?.copy(
-                        type = type,
-                        offsetMinutes = offset,
-                        label = label,
-                        enabled = enabled
-                    ) ?: SunAlarm(
-                        type = type,
-                        offsetMinutes = offset,
-                        label = label,
-                        enabled = enabled
-                    )
-                    onSave(updated)
-                },
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Save")
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = {
+                        val totalMinutes = hours * 60 + minutes
+                        val offset = if (isAfter) totalMinutes else -totalMinutes
+                        val updated = initialAlarm?.copy(
+                            type = type,
+                            offsetMinutes = offset,
+                            label = label,
+                            enabled = enabled
+                        ) ?: SunAlarm(
+                            type = type,
+                            offsetMinutes = offset,
+                            label = label,
+                            enabled = enabled
+                        )
+                        onSave(updated)
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Save")
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
