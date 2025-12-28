@@ -1,5 +1,8 @@
 package com.bfalls.suntimealerts.alarm.presentation.ui
 
+import android.graphics.Paint
+import android.graphics.drawable.ColorDrawable
+import android.widget.EditText
 import android.widget.NumberPicker
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -25,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -40,6 +44,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -54,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -333,7 +339,9 @@ private fun AlarmEditorSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp),
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Column(
             modifier = Modifier
@@ -466,6 +474,8 @@ private fun NumberPickerColumn(
     range: IntRange,
     onValueChange: (Int) -> Unit
 ) {
+    val pickerTextColor = MaterialTheme.colorScheme.onSurface
+    val pickerDividerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = label, fontWeight = FontWeight.Bold)
         AndroidView(
@@ -473,13 +483,16 @@ private fun NumberPickerColumn(
                 NumberPicker(context).apply {
                     minValue = range.first
                     maxValue = range.last
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     setOnValueChangedListener { _, _, newVal -> onValueChange(newVal) }
+                    styleNumberPicker(this, pickerTextColor, pickerDividerColor)
                 }
             },
             update = {
                 if (it.value != value) {
                     it.value = value.coerceIn(range)
                 }
+                styleNumberPicker(it, pickerTextColor, pickerDividerColor)
             }
         )
     }
@@ -600,4 +613,34 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStars(
             center = Offset(x, y)
         )
     }
+}
+
+private fun styleNumberPicker(
+    numberPicker: NumberPicker,
+    textColor: Color,
+    dividerColor: Color
+) {
+    val textColorInt = textColor.toArgb()
+    for (index in 0 until numberPicker.childCount) {
+        val child = numberPicker.getChildAt(index)
+        if (child is EditText) {
+            child.setTextColor(textColorInt)
+        }
+    }
+    try {
+        val selectorWheelPaintField = NumberPicker::class.java.getDeclaredField("mSelectorWheelPaint")
+        selectorWheelPaintField.isAccessible = true
+        val paint = selectorWheelPaintField.get(numberPicker) as Paint
+        paint.color = textColorInt
+    } catch (_: Exception) {
+        // Best-effort styling for OEM variations.
+    }
+    try {
+        val selectionDividerField = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
+        selectionDividerField.isAccessible = true
+        selectionDividerField.set(numberPicker, ColorDrawable(dividerColor.toArgb()))
+    } catch (_: Exception) {
+        // Ignore if the field is not available.
+    }
+    numberPicker.invalidate()
 }
