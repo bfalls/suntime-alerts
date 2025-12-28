@@ -13,6 +13,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Gradle (with caching)
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -57,4 +60,4 @@ jobs:
         run: |
           export ANDROID_SDK_ROOT="$HOME/android-sdk"
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-          ./gradlew test
+          ./gradlew :app:testDebugUnitTest --build-cache
