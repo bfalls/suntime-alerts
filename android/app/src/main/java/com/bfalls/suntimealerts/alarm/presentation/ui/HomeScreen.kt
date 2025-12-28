@@ -77,6 +77,28 @@ import kotlin.random.Random
 @Composable
 fun HomeScreen(viewModel: HomeViewModel) {
     val state by viewModel.state.collectAsState()
+    HomeScreenContent(
+        state = state,
+        onAddAlarm = viewModel::addAlarm,
+        onUpdateAlarm = viewModel::updateAlarm,
+        onToggleAlarmEnabled = viewModel::toggleAlarmEnabled,
+        onDeleteAlarm = viewModel::deleteAlarm,
+        onDuplicateAlarm = viewModel::duplicateAlarm,
+        onRestoreAlarm = viewModel::restoreAlarm
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreenContent(
+    state: HomeViewModel.State,
+    onAddAlarm: (SunEventType, Int, String, Boolean) -> Unit,
+    onUpdateAlarm: (SunAlarm) -> Unit,
+    onToggleAlarmEnabled: (String, Boolean) -> Unit,
+    onDeleteAlarm: (String) -> Unit,
+    onDuplicateAlarm: (String) -> Unit,
+    onRestoreAlarm: (SunAlarm) -> Unit
+) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var editingAlarm by remember { mutableStateOf<SunAlarm?>(null) }
@@ -126,42 +148,42 @@ fun HomeScreen(viewModel: HomeViewModel) {
                     timeText = state.sunriseTimeText,
                     alarms = state.sunriseAlarms,
                     onAdd = { openSheet(null, SunEventType.SUNRISE) },
-                    onToggle = { alarm, enabled -> viewModel.toggleAlarmEnabled(alarm.id, enabled) },
+                    onToggle = { alarm, enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
                     onEdit = { openSheet(it, it.type) },
                     onDelete = { alarm ->
-                        viewModel.deleteAlarm(alarm.id)
+                        onDeleteAlarm(alarm.id)
                         scope.launch {
                             val result = snackbarHostState.showSnackbar(
                                 message = "Sunrise alarm deleted",
                                 actionLabel = "Undo"
                             )
                             if (result == SnackbarResult.ActionPerformed) {
-                                viewModel.restoreAlarm(alarm)
+                                onRestoreAlarm(alarm)
                             }
                         }
                     },
-                    onDuplicate = { viewModel.duplicateAlarm(it.id) }
+                    onDuplicate = { onDuplicateAlarm(it.id) }
                 )
                 AlarmSection(
                     title = "Sunset",
                     timeText = state.sunsetTimeText,
                     alarms = state.sunsetAlarms,
                     onAdd = { openSheet(null, SunEventType.SUNSET) },
-                    onToggle = { alarm, enabled -> viewModel.toggleAlarmEnabled(alarm.id, enabled) },
+                    onToggle = { alarm, enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
                     onEdit = { openSheet(it, it.type) },
                     onDelete = { alarm ->
-                        viewModel.deleteAlarm(alarm.id)
+                        onDeleteAlarm(alarm.id)
                         scope.launch {
                             val result = snackbarHostState.showSnackbar(
                                 message = "Sunset alarm deleted",
                                 actionLabel = "Undo"
                             )
                             if (result == SnackbarResult.ActionPerformed) {
-                                viewModel.restoreAlarm(alarm)
+                                onRestoreAlarm(alarm)
                             }
                         }
                     },
-                    onDuplicate = { viewModel.duplicateAlarm(it.id) }
+                    onDuplicate = { onDuplicateAlarm(it.id) }
                 )
             }
         }
@@ -174,9 +196,9 @@ fun HomeScreen(viewModel: HomeViewModel) {
             onDismiss = { showSheet = false },
             onSave = { alarm ->
                 if (editingAlarm == null) {
-                    viewModel.addAlarm(alarm.type, alarm.offsetMinutes, alarm.label, alarm.enabled)
+                    onAddAlarm(alarm.type, alarm.offsetMinutes, alarm.label, alarm.enabled)
                 } else {
-                    viewModel.updateAlarm(alarm)
+                    onUpdateAlarm(alarm)
                 }
                 showSheet = false
             }
