@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,8 +56,10 @@ import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
+import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import com.bfalls.suntimealerts.utils.hasNotificationPermission
+import kotlinx.coroutines.launch
 
 
 class MainActivity : ComponentActivity() {
@@ -83,7 +86,11 @@ class MainActivity : ComponentActivity() {
             val cityImportState by cityImportViewModel.state.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
+            var hasEnabledAlarms by remember { mutableStateOf(false) }
+            var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
             val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
+            val exactAlarmPermissionTracker = remember { ExactAlarmPermissionTracker(applicationContext) }
+            val coroutineScope = rememberCoroutineScope()
             val notificationPermissionLauncher =
                 rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
@@ -125,6 +132,21 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+            fun requestExactAlarmPermission(reason: String) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+                if (!hasEnabledAlarms) return
+                if (alarmManager.canScheduleExactAlarms()) {
+                    exactAlarmPermissionTracker.reset()
+                    return
+                }
+                if (!exactAlarmPermissionTracker.canRequestExactAlarmPermission()) return
+                if (pendingExactAlarmPermissionRequest) return
+
+                Log.i("MainActivity", "Requesting exact alarm permission ($reason)")
+                pendingExactAlarmPermissionRequest = true
+                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+            }
+
             DisposableEffect(
                 lifecycleOwner,
                 onboardingState.locationPermissionPermanentlyDenied
@@ -144,6 +166,42 @@ class MainActivity : ComponentActivity() {
                 onDispose {
                     lifecycleOwner.lifecycle.removeObserver(observer)
                 }
+            }
+
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        coroutineScope.launch {
+                            val alarms = settingsStore.loadAlarms()
+                            hasEnabledAlarms = alarms.any { it.enabled }
+                        }
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            val canSchedule = alarmManager.canScheduleExactAlarms()
+                            if (canSchedule) {
+                                exactAlarmPermissionTracker.reset()
+                            }
+                            if (pendingExactAlarmPermissionRequest) {
+                                if (!canSchedule) {
+                                    exactAlarmPermissionTracker.recordDenial()
+                                }
+                                pendingExactAlarmPermissionRequest = false
+                            }
+                        } else {
+                            pendingExactAlarmPermissionRequest = false
+                        }
+                    }
+                }
+
+                lifecycleOwner.lifecycle.addObserver(observer)
+
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                hasEnabledAlarms = settingsStore.loadAlarms().any { it.enabled }
             }
 
             LaunchedEffect(
@@ -197,6 +255,16 @@ class MainActivity : ComponentActivity() {
                 ) {
                     notificationPermissionRequested = true
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+
+            LaunchedEffect(
+                onboardingState.isLoaded,
+                onboardingState.onboardingComplete,
+                hasEnabledAlarms
+            ) {
+                if (onboardingState.isLoaded && onboardingState.onboardingComplete) {
+                    requestExactAlarmPermission("active-alerts")
                 }
             }
 
@@ -257,6 +325,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onNotificationsChanged = { enabled ->
                             onboardingViewModel.updateNotifications(enabled)
+                            hasEnabledAlarms = enabled
                             if (
                                 enabled &&
                                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -264,14 +333,7 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             }
-                            if (
-                                enabled &&
-                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                                !alarmManager.canScheduleExactAlarms()
-                            ) {
-                                Log.i("MainActivity", "Requesting exact alarm permission")
-                                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                            }
+                            requestExactAlarmPermission("notifications-toggle")
                         },
                         onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,
                         onSunsetEnabledChanged = onboardingViewModel::updateSunsetEnabled,
