@@ -1,6 +1,7 @@
 package com.bfalls.suntimealerts
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
             val cityImportState by cityImportViewModel.state.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
+            val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
             val notificationPermissionLauncher =
                 rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
@@ -261,6 +263,14 @@ class MainActivity : ComponentActivity() {
                                 !hasNotificationPermission(context)
                             ) {
                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            if (
+                                enabled &&
+                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                !alarmManager.canScheduleExactAlarms()
+                            ) {
+                                Log.i("MainActivity", "Requesting exact alarm permission")
+                                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                             }
                         },
                         onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,

@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -60,6 +61,12 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
             requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val scheduledTime = Instant.ofEpochMilli(triggerAtMillis).atZone(zoneId)
+        Log.i(
+            "NotificationScheduler",
+            "Scheduling ${eventType.name.lowercase()} alarm (id=$alarmId, label=$label, offset=${formatOffset(offsetMinutes)}) " +
+                "for ${scheduledTime.toLocalDate()} ${scheduledTime.toLocalTime()} ${scheduledTime.zone}"
         )
         val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             alarmManager.canScheduleExactAlarms()
@@ -148,6 +155,11 @@ class SunEventReceiver : BroadcastReceiver() {
                 append(offsetText).append(" ").append(anchor)
             }
         }
+
+        Log.i(
+            "SunEventReceiver",
+            "Firing ${eventType.name.lowercase()} alarm (id=$alarmId, label=$label, offset=$offsetText)"
+        )
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
