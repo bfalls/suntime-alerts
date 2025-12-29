@@ -136,18 +136,17 @@ class SunEventReceiver : BroadcastReceiver() {
         }
 
         val title = if (eventType == SunEventType.SUNRISE) "Sunrise alarm" else "Sunset alarm"
-        val timingWord = when {
-            offsetMinutes < 0 -> "before"
-            offsetMinutes > 0 -> "after"
-            else -> "at"
-        }
         val anchor = if (eventType == SunEventType.SUNRISE) "sunrise" else "sunset"
         val offsetText = formatOffset(offsetMinutes)
         val body = buildString {
             if (label.isNotBlank()) {
                 append(label).append(" • ")
             }
-            append(offsetText).append(" ").append(timingWord).append(" ").append(anchor)
+            if (offsetMinutes == 0) {
+                append("At ").append(anchor)
+            } else {
+                append(offsetText).append(" ").append(anchor)
+            }
         }
 
         val notification = NotificationCompat.Builder(context, channelId)

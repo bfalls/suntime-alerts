@@ -14,18 +14,14 @@ data class SunAlarm(
 fun formatOffset(offsetMinutes: Int): String {
     if (offsetMinutes == 0) return "0m"
 
-    val sign = when {
-        offsetMinutes > 0 -> "+"
-        offsetMinutes < 0 -> "-"
-        else -> ""
-    }
     val absoluteMinutes = abs(offsetMinutes)
     val hours = absoluteMinutes / 60
     val minutes = absoluteMinutes % 60
+    val direction = if (offsetMinutes < 0) "before" else "after"
 
     return if (hours > 0) {
-        "$sign${hours}h ${minutes}m"
+        "${hours}h ${minutes}m $direction"
     } else {
-        "$sign${minutes}m"
+        "${minutes}m $direction"
     }
 }
