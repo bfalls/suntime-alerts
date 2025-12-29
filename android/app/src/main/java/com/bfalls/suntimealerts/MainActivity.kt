@@ -18,8 +18,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
@@ -57,7 +63,11 @@ import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
+import com.bfalls.suntimealerts.ui.theme.SurfacePrimary
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
+import com.bfalls.suntimealerts.ui.theme.SunriseAccent
+import com.bfalls.suntimealerts.ui.theme.TextPrimary
+import com.bfalls.suntimealerts.ui.theme.TextSecondary
 import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import com.bfalls.suntimealerts.utils.hasNotificationPermission
@@ -275,7 +285,18 @@ class MainActivity : ComponentActivity() {
                 if (exactAlarmPermissionDialogReason != null) {
                     AlertDialog(
                         onDismissRequest = { exactAlarmPermissionDialogReason = null },
-                        title = { Text("Allow alarms & reminders") },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Alarm,
+                                contentDescription = null
+                            )
+                        },
+                        title = {
+                            Text(
+                                text = "Allow alarms & reminders",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        },
                         text = {
                             Text(
                                 "Suntime Alerts needs permission to schedule alarms. " +
@@ -288,16 +309,30 @@ class MainActivity : ComponentActivity() {
                                     exactAlarmPermissionDialogReason = null
                                     pendingExactAlarmPermissionRequest = true
                                     startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                                }
+                                },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = SunriseAccent
+                                )
                             ) {
                                 Text("Continue")
                             }
                         },
                         dismissButton = {
-                            TextButton(onClick = { exactAlarmPermissionDialogReason = null }) {
+                            TextButton(
+                                onClick = { exactAlarmPermissionDialogReason = null },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = TextSecondary
+                                )
+                            ) {
                                 Text("Not now")
                             }
-                        }
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        containerColor = SurfacePrimary,
+                        iconContentColor = SunriseAccent,
+                        titleContentColor = TextPrimary,
+                        textContentColor = TextSecondary,
+                        tonalElevation = 6.dp
                     )
                 }
 
