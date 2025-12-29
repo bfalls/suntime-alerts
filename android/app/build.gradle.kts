@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.androidx.tools.core)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
     implementation(libs.gson)
+    implementation("androidx.core:core-splashscreen:1.2.0")
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)

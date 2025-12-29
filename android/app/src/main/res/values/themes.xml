@@ -2,4 +2,14 @@
 <resources>
 
     <style name="Theme.SuntimeAlerts" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.SuntimeAlerts.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+
+        <!-- App icon -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+
+        <!-- After splash, switch to your real theme -->
+        <item name="postSplashScreenTheme">@style/Theme.SuntimeAlerts</item>
+    </style>
+
 </resources>

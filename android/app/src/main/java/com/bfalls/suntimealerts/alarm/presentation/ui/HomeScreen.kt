@@ -536,7 +536,7 @@ private fun SunTopBar(
                 .testTag("sun_appbar_background")
         )
         TopAppBar(
-            title = { Text("Sun Alarms") },
+            title = { Text("Suntime Alerts") },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,
                 scrolledContainerColor = Color.Transparent,
