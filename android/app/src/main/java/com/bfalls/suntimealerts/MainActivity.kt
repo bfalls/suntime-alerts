@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -88,6 +90,7 @@ class MainActivity : ComponentActivity() {
             var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var hasEnabledAlarms by remember { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
+            var exactAlarmPermissionDialogReason by rememberSaveable { mutableStateOf<String?>(null) }
             val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
             val exactAlarmPermissionTracker = remember { ExactAlarmPermissionTracker(applicationContext) }
             val coroutineScope = rememberCoroutineScope()
@@ -141,10 +144,10 @@ class MainActivity : ComponentActivity() {
                 }
                 if (!exactAlarmPermissionTracker.canRequestExactAlarmPermission()) return
                 if (pendingExactAlarmPermissionRequest) return
+                if (exactAlarmPermissionDialogReason != null) return
 
                 Log.i("MainActivity", "Requesting exact alarm permission ($reason)")
-                pendingExactAlarmPermissionRequest = true
-                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                exactAlarmPermissionDialogReason = reason
             }
 
             DisposableEffect(
@@ -269,6 +272,35 @@ class MainActivity : ComponentActivity() {
             }
 
             SuntimeAlertsTheme {
+                if (exactAlarmPermissionDialogReason != null) {
+                    AlertDialog(
+                        onDismissRequest = { exactAlarmPermissionDialogReason = null },
+                        title = { Text("Allow alarms & reminders") },
+                        text = {
+                            Text(
+                                "Suntime Alerts needs permission to schedule alarms. " +
+                                    "We'll open the Alarms & reminders settings so you can enable this."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    exactAlarmPermissionDialogReason = null
+                                    pendingExactAlarmPermissionRequest = true
+                                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                }
+                            ) {
+                                Text("Continue")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { exactAlarmPermissionDialogReason = null }) {
+                                Text("Not now")
+                            }
+                        }
+                    )
+                }
+
                 when {
                     cityImportState.isImporting -> Box(
                         modifier = Modifier.fillMaxSize(),
