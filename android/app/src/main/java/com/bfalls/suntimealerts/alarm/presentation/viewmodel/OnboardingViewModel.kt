@@ -58,16 +58,18 @@ class OnboardingViewModel(
 
     private suspend fun load() {
         val settings = settingsStore.load()
+        val sunriseEnabled = settings.alarms.firstOrNull { it.type == SunEventType.SUNRISE }?.enabled ?: true
+        val sunsetEnabled = settings.alarms.firstOrNull { it.type == SunEventType.SUNSET }?.enabled ?: false
         _state.value = _state.value.copy(
             isLoaded = true,
             onboardingComplete = settings.onboardingComplete,
             locationMode = settings.locationMode,
             fixedLatitude = settings.fixedLocation?.latitude?.toString() ?: "",
             fixedLongitude = settings.fixedLocation?.longitude?.toString() ?: "",
-            notificationsEnabled = settings.sunriseConfig.enabled || settings.sunsetConfig.enabled,
-            sunriseEnabled = settings.sunriseConfig.enabled,
+            notificationsEnabled = sunriseEnabled || sunsetEnabled,
+            sunriseEnabled = sunriseEnabled,
             sunriseOffsetMinutes = settings.sunriseConfig.offsetMinutes,
-            sunsetEnabled = settings.sunsetConfig.enabled,
+            sunsetEnabled = sunsetEnabled,
             sunsetOffsetMinutes = settings.sunsetConfig.offsetMinutes
         )
     }
@@ -238,12 +240,10 @@ class OnboardingViewModel(
             settings = settings.copy(
                 locationMode = if (_state.value.locationMode == LocationMode.FIXED) LocationMode.FIXED else LocationMode.DEVICE,
                 sunriseConfig = SunAlarmConfig(
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled,
                     eventType = SunEventType.SUNRISE,
                     offsetMinutes = onboardingState.sunriseOffsetMinutes
                 ),
                 sunsetConfig = SunAlarmConfig(
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled,
                     eventType = SunEventType.SUNSET,
                     offsetMinutes = onboardingState.sunsetOffsetMinutes
                 ),

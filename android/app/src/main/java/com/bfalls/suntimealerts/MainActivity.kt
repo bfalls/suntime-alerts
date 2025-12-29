@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -24,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +55,7 @@ import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
 import com.bfalls.suntimealerts.utils.hasLocationPermission
+import com.bfalls.suntimealerts.utils.hasNotificationPermission
 
 
 class MainActivity : ComponentActivity() {
@@ -78,6 +81,13 @@ class MainActivity : ComponentActivity() {
             )
             val cityImportState by cityImportViewModel.state.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
+            var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
+            val notificationPermissionLauncher =
+                rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    Log.d("MainActivity", "Notification permission result: granted=$granted")
+                }
             val lifecycleOwner = LocalLifecycleOwner.current
             val locationPermissionLauncher =
                 rememberLauncherForActivityResult(
@@ -170,6 +180,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(
+                onboardingState.isLoaded,
+                onboardingState.onboardingComplete,
+                onboardingState.notificationsEnabled
+            ) {
+                if (
+                    onboardingState.isLoaded &&
+                    onboardingState.onboardingComplete &&
+                    onboardingState.notificationsEnabled &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    !hasNotificationPermission(context) &&
+                    !notificationPermissionRequested
+                ) {
+                    notificationPermissionRequested = true
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
 
             SuntimeAlertsTheme {
                 when {
@@ -226,7 +253,16 @@ class MainActivity : ComponentActivity() {
                             }
                             startActivity(intent)
                         },
-                        onNotificationsChanged = onboardingViewModel::updateNotifications,
+                        onNotificationsChanged = { enabled ->
+                            onboardingViewModel.updateNotifications(enabled)
+                            if (
+                                enabled &&
+                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                !hasNotificationPermission(context)
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
                         onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,
                         onSunsetEnabledChanged = onboardingViewModel::updateSunsetEnabled,
                         onSunriseOffsetChanged = onboardingViewModel::updateSunriseOffset,
