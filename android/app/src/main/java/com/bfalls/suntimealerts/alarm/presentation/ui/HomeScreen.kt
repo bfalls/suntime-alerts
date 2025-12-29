@@ -5,6 +5,7 @@ import android.graphics.drawable.ColorDrawable
 import android.widget.EditText
 import android.widget.NumberPicker
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+//import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
@@ -79,7 +82,6 @@ import java.time.ZonedDateTime
 import kotlin.math.abs
 import kotlin.random.Random
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(viewModel: HomeViewModel) {
     val state by viewModel.state.collectAsState()
@@ -94,7 +96,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreenContent(
     state: HomeViewModel.State,
@@ -149,17 +151,17 @@ fun HomeScreenContent(
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
-                    item {
-                        AlarmSection(
-                            title = "Sunrise",
-                            timeText = state.sunriseTimeText,
-                            alarms = state.sunriseAlarms,
-                            onToggle = { alarm, enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                            onEdit = { openSheet(it, it.type) },
-                            onDelete = { alarm ->
+                    stickyHeader {
+                        AlarmSectionHeader(title = "Sunrise", timeText = state.sunriseTimeText)
+                    }
+                    items(state.sunriseAlarms, key = { it.id }) { alarm ->
+                        AlarmRow(
+                            alarm = alarm,
+                            onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
+                            onEdit = { openSheet(alarm, alarm.type) },
+                            onDelete = {
                                 onDeleteAlarm(alarm.id)
                                 scope.launch {
                                     val result = snackbarHostState.showSnackbar(
@@ -171,23 +173,35 @@ fun HomeScreenContent(
                                     }
                                 }
                             },
-                            onDuplicate = { onDuplicateAlarm(it.id) }
+                            onDuplicate = { onDuplicateAlarm(alarm.id) }
                         )
                     }
+                    if (state.sunriseAlarms.isEmpty()) {
+                        item {
+                            Text(
+                                text = "No alarms yet.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+                        }
+                    }
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
                     item {
                         HorizontalDivider(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                             thickness = 1.dp
                         )
                     }
-                    item {
-                        AlarmSection(
-                            title = "Sunset",
-                            timeText = state.sunsetTimeText,
-                            alarms = state.sunsetAlarms,
-                            onToggle = { alarm, enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                            onEdit = { openSheet(it, it.type) },
-                            onDelete = { alarm ->
+                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                    stickyHeader {
+                        AlarmSectionHeader(title = "Sunset", timeText = state.sunsetTimeText)
+                    }
+                    items(state.sunsetAlarms, key = { it.id }) { alarm ->
+                        AlarmRow(
+                            alarm = alarm,
+                            onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
+                            onEdit = { openSheet(alarm, alarm.type) },
+                            onDelete = {
                                 onDeleteAlarm(alarm.id)
                                 scope.launch {
                                     val result = snackbarHostState.showSnackbar(
@@ -199,8 +213,17 @@ fun HomeScreenContent(
                                     }
                                 }
                             },
-                            onDuplicate = { onDuplicateAlarm(it.id) }
+                            onDuplicate = { onDuplicateAlarm(alarm.id) }
                         )
+                    }
+                    if (state.sunsetAlarms.isEmpty()) {
+                        item {
+                            Text(
+                                text = "No alarms yet.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -225,55 +248,27 @@ fun HomeScreenContent(
 }
 
 @Composable
-private fun AlarmSection(
+private fun AlarmSectionHeader(
     title: String,
     timeText: String?,
-    alarms: List<SunAlarm>,
-    modifier: Modifier = Modifier,
-    onToggle: (SunAlarm, Boolean) -> Unit,
-    onEdit: (SunAlarm) -> Unit,
-    onDelete: (SunAlarm) -> Unit,
-    onDuplicate: (SunAlarm) -> Unit
+    modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
         modifier = modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(vertical = 10.dp, horizontal = 12.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(vertical = 10.dp, horizontal = 12.dp)
-        ) {
-            Column {
-                Text(
-                    text = title,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                timeText?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
-                }
-            }
-        }
-        Column(modifier = Modifier.fillMaxWidth()) {
-            alarms.forEach { alarm ->
-                AlarmRow(
-                    alarm = alarm,
-                    onToggle = { enabled -> onToggle(alarm, enabled) },
-                    onEdit = { onEdit(alarm) },
-                    onDelete = { onDelete(alarm) },
-                    onDuplicate = { onDuplicate(alarm) }
-                )
-            }
-            if (alarms.isEmpty()) {
-                Text(
-                    text = "No alarms yet.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
+        Column {
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+            timeText?.let {
+                Text(text = it, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
             }
         }
     }
