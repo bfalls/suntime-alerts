@@ -1,9 +1,11 @@
 package com.bfalls.suntimealerts
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -16,14 +18,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,8 +63,15 @@ import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
+import com.bfalls.suntimealerts.ui.theme.SurfacePrimary
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
+import com.bfalls.suntimealerts.ui.theme.SunriseAccent
+import com.bfalls.suntimealerts.ui.theme.TextPrimary
+import com.bfalls.suntimealerts.ui.theme.TextSecondary
+import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
 import com.bfalls.suntimealerts.utils.hasLocationPermission
+import com.bfalls.suntimealerts.utils.hasNotificationPermission
+import kotlinx.coroutines.launch
 
 
 class MainActivity : ComponentActivity() {
@@ -78,6 +97,19 @@ class MainActivity : ComponentActivity() {
             )
             val cityImportState by cityImportViewModel.state.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
+            var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
+            var hasEnabledAlarms by remember { mutableStateOf(false) }
+            var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
+            var exactAlarmPermissionDialogReason by rememberSaveable { mutableStateOf<String?>(null) }
+            val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
+            val exactAlarmPermissionTracker = remember { ExactAlarmPermissionTracker(applicationContext) }
+            val coroutineScope = rememberCoroutineScope()
+            val notificationPermissionLauncher =
+                rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    Log.d("MainActivity", "Notification permission result: granted=$granted")
+                }
             val lifecycleOwner = LocalLifecycleOwner.current
             val locationPermissionLauncher =
                 rememberLauncherForActivityResult(
@@ -113,6 +145,21 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+            fun requestExactAlarmPermission(reason: String) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+                if (!hasEnabledAlarms) return
+                if (alarmManager.canScheduleExactAlarms()) {
+                    exactAlarmPermissionTracker.reset()
+                    return
+                }
+                if (!exactAlarmPermissionTracker.canRequestExactAlarmPermission()) return
+                if (pendingExactAlarmPermissionRequest) return
+                if (exactAlarmPermissionDialogReason != null) return
+
+                Log.i("MainActivity", "Requesting exact alarm permission ($reason)")
+                exactAlarmPermissionDialogReason = reason
+            }
+
             DisposableEffect(
                 lifecycleOwner,
                 onboardingState.locationPermissionPermanentlyDenied
@@ -132,6 +179,42 @@ class MainActivity : ComponentActivity() {
                 onDispose {
                     lifecycleOwner.lifecycle.removeObserver(observer)
                 }
+            }
+
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        coroutineScope.launch {
+                            val alarms = settingsStore.loadAlarms()
+                            hasEnabledAlarms = alarms.any { it.enabled }
+                        }
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            val canSchedule = alarmManager.canScheduleExactAlarms()
+                            if (canSchedule) {
+                                exactAlarmPermissionTracker.reset()
+                            }
+                            if (pendingExactAlarmPermissionRequest) {
+                                if (!canSchedule) {
+                                    exactAlarmPermissionTracker.recordDenial()
+                                }
+                                pendingExactAlarmPermissionRequest = false
+                            }
+                        } else {
+                            pendingExactAlarmPermissionRequest = false
+                        }
+                    }
+                }
+
+                lifecycleOwner.lifecycle.addObserver(observer)
+
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                hasEnabledAlarms = settingsStore.loadAlarms().any { it.enabled }
             }
 
             LaunchedEffect(
@@ -170,8 +253,89 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(
+                onboardingState.isLoaded,
+                onboardingState.onboardingComplete,
+                onboardingState.notificationsEnabled
+            ) {
+                if (
+                    onboardingState.isLoaded &&
+                    onboardingState.onboardingComplete &&
+                    onboardingState.notificationsEnabled &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    !hasNotificationPermission(context) &&
+                    !notificationPermissionRequested
+                ) {
+                    notificationPermissionRequested = true
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+
+            LaunchedEffect(
+                onboardingState.isLoaded,
+                onboardingState.onboardingComplete,
+                hasEnabledAlarms
+            ) {
+                if (onboardingState.isLoaded && onboardingState.onboardingComplete) {
+                    requestExactAlarmPermission("active-alerts")
+                }
+            }
 
             SuntimeAlertsTheme {
+                if (exactAlarmPermissionDialogReason != null) {
+                    AlertDialog(
+                        onDismissRequest = { exactAlarmPermissionDialogReason = null },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Alarm,
+                                contentDescription = null
+                            )
+                        },
+                        title = {
+                            Text(
+                                text = "Allow alarms & reminders",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        },
+                        text = {
+                            Text(
+                                "Suntime Alerts needs permission to schedule alarms. " +
+                                    "We'll open the Alarms & reminders settings so you can enable this."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    exactAlarmPermissionDialogReason = null
+                                    pendingExactAlarmPermissionRequest = true
+                                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = SunriseAccent
+                                )
+                            ) {
+                                Text("Continue")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { exactAlarmPermissionDialogReason = null },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = TextSecondary
+                                )
+                            ) {
+                                Text("Not now")
+                            }
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        containerColor = SurfacePrimary,
+                        iconContentColor = SunriseAccent,
+                        titleContentColor = TextPrimary,
+                        textContentColor = TextSecondary,
+                        tonalElevation = 6.dp
+                    )
+                }
+
                 when {
                     cityImportState.isImporting -> Box(
                         modifier = Modifier.fillMaxSize(),
@@ -226,7 +390,18 @@ class MainActivity : ComponentActivity() {
                             }
                             startActivity(intent)
                         },
-                        onNotificationsChanged = onboardingViewModel::updateNotifications,
+                        onNotificationsChanged = { enabled ->
+                            onboardingViewModel.updateNotifications(enabled)
+                            hasEnabledAlarms = enabled
+                            if (
+                                enabled &&
+                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                !hasNotificationPermission(context)
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            requestExactAlarmPermission("notifications-toggle")
+                        },
                         onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,
                         onSunsetEnabledChanged = onboardingViewModel::updateSunsetEnabled,
                         onSunriseOffsetChanged = onboardingViewModel::updateSunriseOffset,

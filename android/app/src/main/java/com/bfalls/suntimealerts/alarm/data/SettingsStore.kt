@@ -29,9 +29,7 @@ interface SettingsRepository {
 private val Context.dataStore by preferencesDataStore("sunriseSunset")
 
 class SettingsStore(private val context: Context) : SettingsRepository {
-    private val sunriseEnabled = booleanPreferencesKey("sunrise_enabled")
     private val sunriseOffset = intPreferencesKey("sunrise_offset")
-    private val sunsetEnabled = booleanPreferencesKey("sunset_enabled")
     private val sunsetOffset = intPreferencesKey("sunset_offset")
     private val time24h = booleanPreferencesKey("time_24h")
     private val fixedLat = doublePreferencesKey("fixed_lat")
@@ -42,15 +40,23 @@ class SettingsStore(private val context: Context) : SettingsRepository {
 
     override suspend fun load(): UserSettings {
         val prefs = context.dataStore.data.first()
+        val storedAlarms = loadAlarmsInternal(prefs)
+        val alarms = if (storedAlarms.isNotEmpty()) {
+            storedAlarms
+        } else {
+            migrateAlarms(prefs).also { saveAlarms(it) }
+        }
+        val sunriseEnabled = alarms.firstOrNull { it.type == SunEventType.SUNRISE }?.enabled ?: true
+        val sunsetEnabled = alarms.firstOrNull { it.type == SunEventType.SUNSET }?.enabled ?: false
         val sunriseConfig = SunAlarmConfig(
-            prefs[sunriseEnabled] ?: true,
-            SunEventType.SUNRISE,
-            prefs[sunriseOffset] ?: 0
+            enabled = sunriseEnabled,
+            eventType = SunEventType.SUNRISE,
+            offsetMinutes = prefs[sunriseOffset] ?: 0
         )
         val sunsetConfig = SunAlarmConfig(
-            prefs[sunsetEnabled] ?: false,
-            SunEventType.SUNSET,
-            prefs[sunsetOffset] ?: 0
+            enabled = sunsetEnabled,
+            eventType = SunEventType.SUNSET,
+            offsetMinutes = prefs[sunsetOffset] ?: 0
         )
         val locationMode = if (prefs[fixedLat] != null && prefs[fixedLon] != null) {
             LocationMode.FIXED
@@ -61,12 +67,6 @@ class SettingsStore(private val context: Context) : SettingsRepository {
             prefs[fixedLat] ?: 0.0,
             prefs[fixedLon] ?: 0.0
         ) else null
-        val storedAlarms = loadAlarmsInternal(prefs)
-        val alarms = if (storedAlarms.isNotEmpty()) {
-            storedAlarms
-        } else {
-            migrateAlarms(prefs).also { saveAlarms(it) }
-        }
         return UserSettings(
             locationMode = locationMode,
             fixedLocation = fixed,
@@ -80,9 +80,7 @@ class SettingsStore(private val context: Context) : SettingsRepository {
 
     override suspend fun save(settings: UserSettings) {
         context.dataStore.edit { prefs ->
-            prefs[sunriseEnabled] = settings.sunriseConfig.enabled
             prefs[sunriseOffset] = settings.sunriseConfig.offsetMinutes
-            prefs[sunsetEnabled] = settings.sunsetConfig.enabled
             prefs[sunsetOffset] = settings.sunsetConfig.offsetMinutes
             prefs[time24h] = settings.timeFormat24h
             prefs[onboarding] = settings.onboardingComplete
@@ -122,18 +120,18 @@ class SettingsStore(private val context: Context) : SettingsRepository {
     }
 
     private fun migrateAlarms(prefs: Preferences): List<SunAlarm> = migrateLegacyAlarms(
-        sunriseEnabled = prefs[sunriseEnabled] ?: true,
         sunriseOffset = prefs[sunriseOffset] ?: 0,
-        sunsetEnabled = prefs[sunsetEnabled] ?: false,
-        sunsetOffset = prefs[sunsetOffset] ?: 0
+        sunsetOffset = prefs[sunsetOffset] ?: 0,
+        sunriseEnabled = true,
+        sunsetEnabled = false
     )
 }
 
 internal fun migrateLegacyAlarms(
-    sunriseEnabled: Boolean,
     sunriseOffset: Int,
-    sunsetEnabled: Boolean,
-    sunsetOffset: Int
+    sunsetOffset: Int,
+    sunriseEnabled: Boolean,
+    sunsetEnabled: Boolean
 ): List<SunAlarm> = listOf(
     SunAlarm(
         id = UUID.randomUUID().toString(),
