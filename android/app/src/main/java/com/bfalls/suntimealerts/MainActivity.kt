@@ -13,6 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
@@ -63,6 +65,7 @@ import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
+import com.bfalls.suntimealerts.ui.theme.SplashBackground
 import com.bfalls.suntimealerts.ui.theme.SurfacePrimary
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
 import com.bfalls.suntimealerts.ui.theme.SunriseAccent
@@ -282,137 +285,145 @@ class MainActivity : ComponentActivity() {
             }
 
             SuntimeAlertsTheme {
-                if (exactAlarmPermissionDialogReason != null) {
-                    AlertDialog(
-                        onDismissRequest = { exactAlarmPermissionDialogReason = null },
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Alarm,
-                                contentDescription = null
-                            )
-                        },
-                        title = {
-                            Text(
-                                text = "Allow alarms & reminders",
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                        },
-                        text = {
-                            Text(
-                                "Suntime Alerts needs permission to schedule alarms. " +
-                                    "We'll open the Alarms & reminders settings so you can enable this."
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    exactAlarmPermissionDialogReason = null
-                                    pendingExactAlarmPermissionRequest = true
-                                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                                },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = SunriseAccent
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    if (exactAlarmPermissionDialogReason != null) {
+                        AlertDialog(
+                            onDismissRequest = { exactAlarmPermissionDialogReason = null },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Alarm,
+                                    contentDescription = null
                                 )
-                            ) {
-                                Text("Continue")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = { exactAlarmPermissionDialogReason = null },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = TextSecondary
-                                )
-                            ) {
-                                Text("Not now")
-                            }
-                        },
-                        shape = RoundedCornerShape(24.dp),
-                        containerColor = SurfacePrimary,
-                        iconContentColor = SunriseAccent,
-                        titleContentColor = TextPrimary,
-                        textContentColor = TextSecondary,
-                        tonalElevation = 6.dp
-                    )
-                }
-
-                when {
-                    cityImportState.isImporting -> Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "Preparing Suntime Alerts…")
-                            Spacer(modifier = Modifier.height(16.dp))
-                            CircularProgressIndicator(
-                                progress = cityImportState.progress
-                            )
-                            if (cityImportState.total > 0) {
-                                Spacer(modifier = Modifier.height(8.dp))
+                            },
+                            title = {
                                 Text(
-                                    text = "${cityImportState.current} / ${cityImportState.total}"
+                                    text = "Allow alarms & reminders",
+                                    style = MaterialTheme.typography.titleLarge
                                 )
-                            }
-                        }
+                            },
+                            text = {
+                                Text(
+                                    "Suntime Alerts needs permission to schedule alarms. " +
+                                        "We'll open the Alarms & reminders settings so you can enable this."
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        exactAlarmPermissionDialogReason = null
+                                        pendingExactAlarmPermissionRequest = true
+                                        startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = SunriseAccent
+                                    )
+                                ) {
+                                    Text("Continue")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    onClick = { exactAlarmPermissionDialogReason = null },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = TextSecondary
+                                    )
+                                ) {
+                                    Text("Not now")
+                                }
+                            },
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = SurfacePrimary,
+                            iconContentColor = SunriseAccent,
+                            titleContentColor = TextPrimary,
+                            textContentColor = TextSecondary,
+                            tonalElevation = 6.dp
+                        )
                     }
-                    !onboardingState.isLoaded -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                    onboardingState.onboardingComplete -> HomeScreen(viewModel = homeViewModel)
-                    else -> OnboardingScreen(
-                        state = onboardingState,
-                        onLocationModeChanged = { mode ->
-                            when (mode) {
-                                LocationMode.DEVICE -> {
-                                    onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
 
-                                    if (hasLocationPermission(context)) {
-                                        // Already granted → just switch to device mode
-                                        onboardingViewModel.clearLocationPermissionDenial()
-                                        return@OnboardingScreen
-                                    }
-
-                                    // Trigger system permission dialog after the UI switches to device mode
-                                    permissionRequestOrigin = PermissionRequestOrigin.USER
-                                    locationPermissionLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
+                    when {
+                        cityImportState.isImporting -> Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(SplashBackground),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(text = "Preparing Suntime Alerts…", color = TextPrimary)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                CircularProgressIndicator(
+                                    progress = cityImportState.progress
+                                )
+                                if (cityImportState.total > 0) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "${cityImportState.current} / ${cityImportState.total}",
+                                        color = TextSecondary
                                     )
                                 }
-                                LocationMode.FIXED -> {
-                                    onboardingViewModel.updateLocationMode(LocationMode.FIXED)
+                            }
+                        }
+                        !onboardingState.isLoaded -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                        onboardingState.onboardingComplete -> HomeScreen(viewModel = homeViewModel)
+                        else -> OnboardingScreen(
+                            state = onboardingState,
+                            onLocationModeChanged = { mode ->
+                                when (mode) {
+                                    LocationMode.DEVICE -> {
+                                        onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
+
+                                        if (hasLocationPermission(context)) {
+                                            // Already granted → just switch to device mode
+                                            onboardingViewModel.clearLocationPermissionDenial()
+                                            return@OnboardingScreen
+                                        }
+
+                                        // Trigger system permission dialog after the UI switches to device mode
+                                        permissionRequestOrigin = PermissionRequestOrigin.USER
+                                        locationPermissionLauncher.launch(
+                                            arrayOf(
+                                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            )
+                                        )
+                                    }
+                                    LocationMode.FIXED -> {
+                                        onboardingViewModel.updateLocationMode(LocationMode.FIXED)
+                                    }
                                 }
-                            }
-                        },
-                        onOpenPermissionSettings = {
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", packageName, null)
-                            }
-                            startActivity(intent)
-                        },
-                        onNotificationsChanged = { enabled ->
-                            onboardingViewModel.updateNotifications(enabled)
-                            hasEnabledAlarms = enabled
-                            if (
-                                enabled &&
-                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                !hasNotificationPermission(context)
-                            ) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                            requestExactAlarmPermission("notifications-toggle")
-                        },
-                        onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,
-                        onSunsetEnabledChanged = onboardingViewModel::updateSunsetEnabled,
-                        onSunriseOffsetChanged = onboardingViewModel::updateSunriseOffset,
-                        onSunsetOffsetChanged = onboardingViewModel::updateSunsetOffset,
-                        onCityQueryChanged = onboardingViewModel::updateCityQuery,
-                        onCitySelected = onboardingViewModel::selectCity,
-                        onNext = onboardingViewModel::nextStep,
-                        onBack = onboardingViewModel::previousStep,
-                        onComplete = { onboardingViewModel.complete { } },
-                        canAdvance = onboardingViewModel.canAdvance()
-                    )
+                            },
+                            onOpenPermissionSettings = {
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", packageName, null)
+                                }
+                                startActivity(intent)
+                            },
+                            onNotificationsChanged = { enabled ->
+                                onboardingViewModel.updateNotifications(enabled)
+                                hasEnabledAlarms = enabled
+                                if (
+                                    enabled &&
+                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    !hasNotificationPermission(context)
+                                ) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                requestExactAlarmPermission("notifications-toggle")
+                            },
+                            onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,
+                            onSunsetEnabledChanged = onboardingViewModel::updateSunsetEnabled,
+                            onSunriseOffsetChanged = onboardingViewModel::updateSunriseOffset,
+                            onSunsetOffsetChanged = onboardingViewModel::updateSunsetOffset,
+                            onCityQueryChanged = onboardingViewModel::updateCityQuery,
+                            onCitySelected = onboardingViewModel::selectCity,
+                            onNext = onboardingViewModel::nextStep,
+                            onBack = onboardingViewModel::previousStep,
+                            onComplete = { onboardingViewModel.complete { } },
+                            canAdvance = onboardingViewModel.canAdvance()
+                        )
+                    }
                 }
             }
         }

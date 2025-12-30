@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -75,6 +76,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunXY
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZoneId
@@ -133,99 +135,25 @@ fun HomeScreenContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        if (state.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Loading…")
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    stickyHeader {
-                        AlarmSectionHeader(title = "Sunrise", timeText = state.sunriseTimeText)
-                    }
-                    items(state.sunriseAlarms, key = { it.id }) { alarm ->
-                        AlarmRow(
-                            alarm = alarm,
-                            onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                            onEdit = { openSheet(alarm, alarm.type) },
-                            onDelete = {
-                                onDeleteAlarm(alarm.id)
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "Sunrise alarm deleted",
-                                        actionLabel = "Undo"
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        onRestoreAlarm(alarm)
-                                    }
-                                }
-                            },
-                            onDuplicate = { onDuplicateAlarm(alarm.id) }
-                        )
-                    }
-                    if (state.sunriseAlarms.isEmpty()) {
-                        item {
-                            Text(
-                                text = "No alarms yet.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 12.dp)
-                            )
-                        }
-                    }
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
-                    item {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                            thickness = 1.dp
-                        )
-                    }
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
-                    stickyHeader {
-                        AlarmSectionHeader(title = "Sunset", timeText = state.sunsetTimeText)
-                    }
-                    items(state.sunsetAlarms, key = { it.id }) { alarm ->
-                        AlarmRow(
-                            alarm = alarm,
-                            onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                            onEdit = { openSheet(alarm, alarm.type) },
-                            onDelete = {
-                                onDeleteAlarm(alarm.id)
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "Sunset alarm deleted",
-                                        actionLabel = "Undo"
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        onRestoreAlarm(alarm)
-                                    }
-                                }
-                            },
-                            onDuplicate = { onDuplicateAlarm(alarm.id) }
-                        )
-                    }
-                    if (state.sunsetAlarms.isEmpty()) {
-                        item {
-                            Text(
-                                text = "No alarms yet.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 12.dp)
-                            )
-                        }
-                    }
-                }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            AlarmLists(
+                state = state,
+                onToggleAlarmEnabled = onToggleAlarmEnabled,
+                onEditAlarm = { alarm, type -> openSheet(alarm, type) },
+                onDeleteAlarm = onDeleteAlarm,
+                onRestoreAlarm = onRestoreAlarm,
+                onDuplicateAlarm = onDuplicateAlarm,
+                snackbarHostState = snackbarHostState,
+                scope = scope
+            )
+
+            if (state.isLoading) {
+                LoadingOverlay()
             }
         }
     }
@@ -656,4 +584,113 @@ private fun styleNumberPicker(
         // Ignore if the field is not available.
     }
     numberPicker.invalidate()
+}
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AlarmLists(
+    state: HomeViewModel.State,
+    onToggleAlarmEnabled: (String, Boolean) -> Unit,
+    onEditAlarm: (SunAlarm?, SunEventType) -> Unit,
+    onDeleteAlarm: (String) -> Unit,
+    onRestoreAlarm: (SunAlarm) -> Unit,
+    onDuplicateAlarm: (String) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    scope: CoroutineScope
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
+        stickyHeader {
+            AlarmSectionHeader(title = "Sunrise", timeText = state.sunriseTimeText)
+        }
+        items(state.sunriseAlarms, key = { it.id }) { alarm ->
+            AlarmRow(
+                alarm = alarm,
+                onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
+                onEdit = { onEditAlarm(alarm, alarm.type) },
+                onDelete = {
+                    onDeleteAlarm(alarm.id)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Sunrise alarm deleted",
+                            actionLabel = "Undo"
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            onRestoreAlarm(alarm)
+                        }
+                    }
+                },
+                onDuplicate = { onDuplicateAlarm(alarm.id) }
+            )
+        }
+        if (state.sunriseAlarms.isEmpty()) {
+            item {
+                Text(
+                    text = "No alarms yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
+        }
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+        item {
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                thickness = 1.dp
+            )
+        }
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+        stickyHeader {
+            AlarmSectionHeader(title = "Sunset", timeText = state.sunsetTimeText)
+        }
+        items(state.sunsetAlarms, key = { it.id }) { alarm ->
+            AlarmRow(
+                alarm = alarm,
+                onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
+                onEdit = { onEditAlarm(alarm, alarm.type) },
+                onDelete = {
+                    onDeleteAlarm(alarm.id)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Sunset alarm deleted",
+                            actionLabel = "Undo"
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            onRestoreAlarm(alarm)
+                        }
+                    }
+                },
+                onDuplicate = { onDuplicateAlarm(alarm.id) }
+            )
+        }
+        if (state.sunsetAlarms.isEmpty()) {
+            item {
+                Text(
+                    text = "No alarms yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Loading…",
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
 }
