@@ -3,13 +3,14 @@ package com.bfalls.suntimealerts.alarm.services
 import android.Manifest
 import android.R
 import android.app.AlarmManager
+import android.app.AppOpsManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.app.AppOpsManager
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.os.Build
 import android.provider.Settings
@@ -17,6 +18,7 @@ import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.bfalls.suntimealerts.MainActivity
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
@@ -44,7 +46,6 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val prefs = context.getSharedPreferences("sun_alarm_requests", Context.MODE_PRIVATE)
     private val requestCodesKey = "request_codes"
-    private val channelId = "sun_event_channel"
 
     override fun schedule(
         alarmId: String,
@@ -62,7 +63,7 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
             putExtra("offsetMinutes", offsetMinutes)
             putExtra("zoneId", zoneId.id)
         }
-        ensureChannelExists()
+        SunEventReceiver.ensureChannelExists(context)
         val requestCode = requestCode(alarmId, date)
         val pending = PendingIntent.getBroadcast(
             context,
@@ -128,46 +129,24 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
     private fun requestCode(alarmId: String, date: LocalDate): Int {
         return abs((alarmId + date.toString()).hashCode())
     }
-
-    private fun ensureChannelExists() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val existing = manager.getNotificationChannel(channelId)
-        if (existing != null) return
-
-        val alarmSound = Settings.System.DEFAULT_ALARM_ALERT_URI
-        val audioAttrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ALARM)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
-
-        val channel = NotificationChannel(
-            channelId,
-            "Suntime Alerts",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "Notifications for sunrise and sunset alerts"
-            enableVibration(true)
-            enableLights(true)
-            setSound(alarmSound, audioAttrs)
-        }
-        manager.createNotificationChannel(channel)
-    }
 }
 
 class SunEventReceiver : BroadcastReceiver() {
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    override fun onReceive(context: Context, intent: Intent) {
-        val typeValue = intent.getStringExtra("type") ?: return
-        val eventType = runCatching { SunEventType.valueOf(typeValue) }.getOrNull() ?: return
-        val offsetMinutes = intent.getIntExtra("offsetMinutes", 0)
-        val label = intent.getStringExtra("label").orEmpty()
-        val alarmId = intent.getStringExtra("alarmId") ?: UUID.randomUUID().toString()
+    companion object {
+        const val channelId = "sun_event_channel"
 
-        val channelId = "sun_event_channel"
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        fun ensureChannelExists(context: Context): NotificationChannel? {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val existing = manager.getNotificationChannel(channelId)
+            if (existing != null) return existing
+
+            val alarmSound = Settings.System.DEFAULT_ALARM_ALERT_URI
+            val audioAttrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
             val channel = NotificationChannel(
                 channelId,
                 "Suntime Alerts",
@@ -176,8 +155,56 @@ class SunEventReceiver : BroadcastReceiver() {
                 description = "Notifications for sunrise and sunset alerts"
                 enableVibration(true)
                 enableLights(true)
+                setSound(alarmSound, audioAttrs)
             }
-            notificationManager.createNotificationChannel(channel)
+            manager.createNotificationChannel(channel)
+            return channel
+        }
+    }
+
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    override fun onReceive(context: Context, intent: Intent) {
+        val typeValue = intent.getStringExtra("type") ?: return
+        val eventType = runCatching { SunEventType.valueOf(typeValue) }.getOrNull() ?: return
+        val offsetMinutes = intent.getIntExtra("offsetMinutes", 0)
+        val label = intent.getStringExtra("label").orEmpty()
+        val alarmId = intent.getStringExtra("alarmId") ?: UUID.randomUUID().toString()
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(
+                "SunEventReceiver",
+                "Skipping ${eventType.name.lowercase()} alarm (id=$alarmId) because POST_NOTIFICATIONS is not granted."
+            )
+            return
+        }
+
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = ensureChannelExists(context)
+        val channelImportance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            (channel ?: notificationManager.getNotificationChannel(channelId))?.importance
+                ?: NotificationManager.IMPORTANCE_DEFAULT
+        } else {
+            NotificationManager.IMPORTANCE_DEFAULT
+        }
+        val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        if (!notificationsEnabled) {
+            Log.w(
+                "SunEventReceiver",
+                "Notifications are disabled for the app; unable to show ${eventType.name.lowercase()} alarm (id=$alarmId)."
+            )
+            return
+        }
+        if (channelImportance == NotificationManager.IMPORTANCE_NONE) {
+            Log.w(
+                "SunEventReceiver",
+                "Notification channel \"$channelId\" is blocked; unable to show ${eventType.name.lowercase()} alarm (id=$alarmId). " +
+                    "Prompt the user to re-enable Suntime Alerts notifications in system settings."
+            )
+            return
         }
 
         val title = if (eventType == SunEventType.SUNRISE) "Sunrise alarm" else "Sunset alarm"
@@ -224,6 +251,7 @@ class SunEventReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setFullScreenIntent(fullScreenIntent, true)
             .setContentIntent(contentIntent)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
