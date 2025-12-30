@@ -10,6 +10,7 @@ data class SunEvent(
 )
 
 data class SunAlarmConfig(
+    val enabled: Boolean,
     val eventType: SunEventType,
     val offsetMinutes: Int
 )

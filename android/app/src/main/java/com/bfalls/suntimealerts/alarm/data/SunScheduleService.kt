@@ -6,7 +6,6 @@ import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.services.AlarmScheduler
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -23,7 +22,6 @@ class SunScheduleService(
     override suspend fun schedule(coordinate: Coordinate, zoneId: ZoneId) {
         val alarms = settingsStore.loadAlarms()
         val today = LocalDate.now(zoneId)
-        val nowMillis = Instant.now().atZone(zoneId).toInstant().toEpochMilli()
         val dates = listOf(today, today.plusDays(1))
         notificationScheduler.cancelAll()
         dates.forEach { date ->
@@ -34,7 +32,6 @@ class SunScheduleService(
                     SunEventType.SUNSET -> times.sunset
                 } ?: return@forEach
                 val trigger = baseTime.toInstant().toEpochMilli() + alarm.offsetMinutes * 60 * 1000L
-                if (trigger <= nowMillis) return@forEach
                 notificationScheduler.schedule(
                     alarmId = alarm.id,
                     eventType = alarm.type,

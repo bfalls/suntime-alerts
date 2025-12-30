@@ -240,10 +240,12 @@ class OnboardingViewModel(
             settings = settings.copy(
                 locationMode = if (_state.value.locationMode == LocationMode.FIXED) LocationMode.FIXED else LocationMode.DEVICE,
                 sunriseConfig = SunAlarmConfig(
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled,
                     eventType = SunEventType.SUNRISE,
                     offsetMinutes = onboardingState.sunriseOffsetMinutes
                 ),
                 sunsetConfig = SunAlarmConfig(
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled,
                     eventType = SunEventType.SUNSET,
                     offsetMinutes = onboardingState.sunsetOffsetMinutes
                 ),
