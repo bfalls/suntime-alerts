@@ -19,7 +19,6 @@ import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.bfalls.suntimealerts.MainActivity
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import java.time.Instant
@@ -134,6 +133,7 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
 class SunEventReceiver : BroadcastReceiver() {
     companion object {
         const val channelId = "sun_event_channel"
+        const val actionDismiss = "com.bfalls.suntimealerts.ACTION_DISMISS_ALARM"
 
         fun ensureChannelExists(context: Context): NotificationChannel? {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
@@ -164,6 +164,12 @@ class SunEventReceiver : BroadcastReceiver() {
 
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == actionDismiss) {
+            val alarmId = intent.getStringExtra("alarmId") ?: return
+            NotificationManagerCompat.from(context).cancel(alarmId.hashCode())
+            return
+        }
+
         val typeValue = intent.getStringExtra("type") ?: return
         val eventType = runCatching { SunEventType.valueOf(typeValue) }.getOrNull() ?: return
         val offsetMinutes = intent.getIntExtra("offsetMinutes", 0)
@@ -226,21 +232,15 @@ class SunEventReceiver : BroadcastReceiver() {
             "Firing ${eventType.name.lowercase()} alarm (id=$alarmId, label=$label, offset=$offsetText)"
         )
 
-        val launchIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        val dismissIntent = Intent(context, SunEventReceiver::class.java).apply {
+            action = actionDismiss
+            putExtra("alarmId", alarmId)
         }
 
-        val contentIntent = PendingIntent.getActivity(
+        val contentIntent = PendingIntent.getBroadcast(
             context,
             alarmId.hashCode(),
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val fullScreenIntent = PendingIntent.getActivity(
-            context,
-            alarmId.hashCode() + 1,
-            launchIntent,
+            dismissIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -252,8 +252,8 @@ class SunEventReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setFullScreenIntent(fullScreenIntent, true)
             .setContentIntent(contentIntent)
+            .setDeleteIntent(contentIntent)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .build()
