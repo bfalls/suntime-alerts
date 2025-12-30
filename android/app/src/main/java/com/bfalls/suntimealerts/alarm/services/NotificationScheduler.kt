@@ -1,5 +1,7 @@
 package com.bfalls.suntimealerts.alarm.services
 
+import android.Manifest
+import android.R
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,10 +9,15 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.app.AppOpsManager
+import android.media.AudioAttributes
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.bfalls.suntimealerts.MainActivity
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import java.time.Instant
@@ -55,6 +62,7 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
             putExtra("offsetMinutes", offsetMinutes)
             putExtra("zoneId", zoneId.id)
         }
+        ensureChannelExists()
         val requestCode = requestCode(alarmId, date)
         val pending = PendingIntent.getBroadcast(
             context,
@@ -120,9 +128,35 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
     private fun requestCode(alarmId: String, date: LocalDate): Int {
         return abs((alarmId + date.toString()).hashCode())
     }
+
+    private fun ensureChannelExists() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val existing = manager.getNotificationChannel(channelId)
+        if (existing != null) return
+
+        val alarmSound = Settings.System.DEFAULT_ALARM_ALERT_URI
+        val audioAttrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+
+        val channel = NotificationChannel(
+            channelId,
+            "Suntime Alerts",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Notifications for sunrise and sunset alerts"
+            enableVibration(true)
+            enableLights(true)
+            setSound(alarmSound, audioAttrs)
+        }
+        manager.createNotificationChannel(channel)
+    }
 }
 
 class SunEventReceiver : BroadcastReceiver() {
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override fun onReceive(context: Context, intent: Intent) {
         val typeValue = intent.getStringExtra("type") ?: return
         val eventType = runCatching { SunEventType.valueOf(typeValue) }.getOrNull() ?: return
@@ -137,8 +171,12 @@ class SunEventReceiver : BroadcastReceiver() {
             val channel = NotificationChannel(
                 channelId,
                 "Suntime Alerts",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications for sunrise and sunset alerts"
+                enableVibration(true)
+                enableLights(true)
+            }
             notificationManager.createNotificationChannel(channel)
         }
 
@@ -161,14 +199,54 @@ class SunEventReceiver : BroadcastReceiver() {
             "Firing ${eventType.name.lowercase()} alarm (id=$alarmId, label=$label, offset=$offsetText)"
         )
 
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            alarmId.hashCode(),
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val fullScreenIntent = PendingIntent.getActivity(
+            context,
+            alarmId.hashCode() + 1,
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setContentIntent(contentIntent)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .build()
 
         NotificationManagerCompat.from(context).notify(alarmId.hashCode(), notification)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val appOps = context.getSystemService(AppOpsManager::class.java)
+            val op = "android:use_full_screen_intent" // constant not available pre-Upside Down Cake in older SDKs
+            val mode = appOps.checkOpNoThrow(
+                op,
+                context.applicationInfo.uid,
+                context.packageName
+            )
+            if (mode != AppOpsManager.MODE_ALLOWED) {
+                Log.w(
+                    "SunEventReceiver",
+                    "Full-screen intent not allowed by user/system (mode=$mode). " +
+                            "Guide the user to allow full-screen notifications in system settings."
+                )
+            }
+        }
     }
 }
