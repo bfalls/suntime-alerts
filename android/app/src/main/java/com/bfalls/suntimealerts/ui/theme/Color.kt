@@ -3,6 +3,7 @@ package com.bfalls.suntimealerts.ui.theme
 import androidx.compose.ui.graphics.Color
 
 val DeepNavy = Color(0xFF0B1D33)
+val SplashBackground = Color(0xFF0B1A2A)
 val SurfacePrimary = Color(0xFF121E2A)
 val SurfaceSecondary = Color(0xFF182435)
 val SunriseAccent = Color(0xFFF9A826)
