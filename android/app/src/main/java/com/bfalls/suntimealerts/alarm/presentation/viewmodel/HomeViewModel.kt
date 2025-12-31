@@ -10,6 +10,8 @@ import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.domain.service.MoonEphemeris
+import com.bfalls.suntimealerts.alarm.domain.service.MoonTimesCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,12 +39,18 @@ class HomeViewModel(
 
     data class State(
         val isLoading: Boolean = true,
+        val coordinateUsed: Coordinate? = null,
         val sunriseTime: ZonedDateTime? = null,
         val sunsetTime: ZonedDateTime? = null,
         val sunriseTimeText: String? = null,
         val sunsetTimeText: String? = null,
         val sunriseAlarms: List<SunAlarm> = emptyList(),
         val sunsetAlarms: List<SunAlarm> = emptyList(),
+        val moonRiseTime: ZonedDateTime? = null,
+        val moonSetTime: ZonedDateTime? = null,
+        val moonMaxAltDeg: Double = 0.0,
+        val moonIllumination01: Double = 0.0,
+        val moonIsWaxing: Boolean = true,
         val error: String? = null
     )
 
@@ -155,17 +163,29 @@ class HomeViewModel(
             settingsStore.saveAlarms(alarms)
         }
         val coordinate = resolveCoordinate(settings)
+        val coordinateUsed = coordinate
         val sunTimes = coordinate?.let {
             sunTimesCalculator.calculateSunTimes(LocalDate.now(zoneId), it, zoneId)
         } ?: placeholderSunTimes
+        val now = ZonedDateTime.now(zoneId)
+        val moonWindow = coordinate?.let {
+            MoonTimesCalculator.computeWindow(now, it.latitude, it.longitude)
+        }
+        val moonPhase = MoonEphemeris.moonPhase(now)
         _state.value = State(
             isLoading = false,
+            coordinateUsed = coordinateUsed,
             sunriseTime = sunTimes?.sunrise,
             sunsetTime = sunTimes?.sunset,
             sunriseTimeText = formatTime(sunTimes?.sunrise, settings.timeFormat24h),
             sunsetTimeText = formatTime(sunTimes?.sunset, settings.timeFormat24h),
             sunriseAlarms = alarms.filter { it.type == SunEventType.SUNRISE }.sortedBy { it.offsetMinutes },
             sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes },
+            moonRiseTime = moonWindow?.rise,
+            moonSetTime = moonWindow?.set,
+            moonMaxAltDeg = moonWindow?.maxAltDeg ?: 0.0,
+            moonIllumination01 = moonPhase.illumination01,
+            moonIsWaxing = moonPhase.isWaxing,
             error = if (coordinate == null) "Location unavailable" else null
         )
 
