@@ -100,6 +100,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.random.Random
 
 @VisibleForTesting
@@ -628,18 +629,18 @@ private fun SkyAppBarBackground(
         }
         val arcScale = SunArcPositionCalculator.computeArcScale(dayLengthMinutes)
         val horizonY = size.height * 0.75f
-        val arcHeight = size.height * 0.45f * arcScale.toFloat()
-        val moonArcScale = if (moonMaxAltDeg > 0) {
-            (moonMaxAltDeg / 90.0).toFloat().coerceIn(0.35f, 1.1f)
-        } else {
-            0.65f
-        }
+        val sunArcHeight = size.height * 0.45f * arcScale.toFloat()
+        val moonArcHeight = calculateMoonArcHeight(
+            moonMaxAltDeg = moonMaxAltDeg,
+            horizonY = horizonY,
+            height = size.height
+        )
         val t = SunArcPositionCalculator.computeSunT(now, sunrise, sunset)
         val sunPosition: SunXY = SunArcPositionCalculator.computeSunXY(
             t = t,
             width = size.width,
             horizonY = horizonY,
-            arcHeight = arcHeight,
+            arcHeight = sunArcHeight,
             horizontalPadding = size.width * 0.1f
         )
         val moonPosition: MoonXY = if (moonWindowComplete) {
@@ -649,7 +650,7 @@ private fun SkyAppBarBackground(
                 set = moonSet,
                 width = size.width,
                 horizonY = horizonY,
-                arcHeight = arcHeight * moonArcScale,
+                arcHeight = moonArcHeight,
                 horizontalPadding = size.width * 0.1f
             )
         } else {
@@ -659,7 +660,7 @@ private fun SkyAppBarBackground(
                 set = null,
                 width = size.width,
                 horizonY = horizonY,
-                arcHeight = arcHeight * moonArcScale,
+                arcHeight = moonArcHeight,
                 horizontalPadding = size.width * 0.1f
             )
         }
@@ -766,6 +767,21 @@ private fun SkyAppBarBackground(
             )
         }
     }
+}
+
+private fun calculateMoonArcHeight(
+    moonMaxAltDeg: Double,
+    horizonY: Float,
+    height: Float
+): Float {
+    val topPadding = height * 0.08f
+    val maxArcSpan = (horizonY - topPadding).coerceAtLeast(height * 0.2f)
+    val altitudeRad = Math.toRadians(moonMaxAltDeg.coerceIn(0.0, 90.0))
+    val altitudeFactor = sin(altitudeRad).toFloat().coerceIn(0.25f, 1.1f)
+    val desiredArcHeight = maxArcSpan * altitudeFactor
+    val minArcHeight = height * 0.2f
+    val maxArcHeight = maxArcSpan * 1.05f
+    return desiredArcHeight.coerceIn(minArcHeight, maxArcHeight)
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStars(
