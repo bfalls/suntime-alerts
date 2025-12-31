@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -75,6 +76,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunXY
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZoneId
@@ -118,13 +120,18 @@ fun HomeScreenContent(
         sheetType = type
         showSheet = true
     }
+    val hasSunTimes = state.sunriseTime != null && state.sunsetTime != null
+    val readyToRender = !state.isLoading && hasSunTimes
 
     Scaffold(
         topBar = {
-            SunTopBar(
-                sunrise = state.sunriseTime,
-                sunset = state.sunsetTime
-            )
+            if (readyToRender) {
+                SunTopBar(
+                    sunrise = state.sunriseTime,
+                    sunset = state.sunsetTime,
+                    sunTimesResolved = readyToRender
+                )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { openSheet(null, SunEventType.SUNRISE) }) {
@@ -133,7 +140,7 @@ fun HomeScreenContent(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        if (state.isLoading) {
+        if (!readyToRender) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -521,7 +528,8 @@ private fun NumberPickerColumn(
 @Composable
 private fun SunTopBar(
     sunrise: ZonedDateTime?,
-    sunset: ZonedDateTime?
+    sunset: ZonedDateTime?,
+    sunTimesResolved: Boolean
 ) {
     Box(
         modifier = Modifier
@@ -531,6 +539,7 @@ private fun SunTopBar(
         SunAppBarBackground(
             sunrise = sunrise,
             sunset = sunset,
+            sunTimesResolved = sunTimesResolved,
             modifier = Modifier
                 .matchParentSize()
                 .testTag("sun_appbar_background")
@@ -551,10 +560,14 @@ private fun SunTopBar(
 private fun SunAppBarBackground(
     sunrise: ZonedDateTime?,
     sunset: ZonedDateTime?,
+    sunTimesResolved: Boolean,
     modifier: Modifier = Modifier
 ) {
     val zone = sunrise?.zone ?: sunset?.zone ?: ZoneId.systemDefault()
     val now = ZonedDateTime.now(zone)
+    val hasSunTimes = sunTimesResolved && sunrise != null && sunset != null
+    val placeholderTop = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
+    val placeholderBottom = MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp)
     Canvas(modifier = modifier) {
         val dayLengthMinutes = if (sunrise != null && sunset != null) {
             Duration.between(sunrise, sunset).toMinutes()
@@ -572,25 +585,38 @@ private fun SunAppBarBackground(
             arcHeight = arcHeight,
             horizontalPadding = size.width * 0.1f
         )
-        val isDay = sunPosition.isDay && sunrise != null && sunset != null
-        val gradient = if (isDay) {
-            Brush.verticalGradient(
-                listOf(
-                    Color(0xFF64B5F6),
-                    Color(0xFFBBDEFB)
+        val isDay = sunPosition.isDay && hasSunTimes
+        val gradient = when {
+            isDay -> {
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF64B5F6),
+                        Color(0xFFBBDEFB)
+                    )
                 )
-            )
-        } else {
-            Brush.verticalGradient(
-                listOf(
-                    Color(0xFF0D1B2A),
-                    Color(0xFF001219)
+            }
+
+            hasSunTimes -> {
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF0D1B2A),
+                        Color(0xFF001219)
+                    )
                 )
-            )
+            }
+
+            else -> {
+                Brush.verticalGradient(
+                    listOf(
+                        placeholderTop,
+                        placeholderBottom
+                    )
+                )
+            }
         }
         drawRect(brush = gradient, size = size)
 
-        if (!isDay) {
+        if (hasSunTimes && !isDay) {
             drawStars(horizonY, now.toLocalDate().toEpochDay())
         }
 
@@ -656,4 +682,113 @@ private fun styleNumberPicker(
         // Ignore if the field is not available.
     }
     numberPicker.invalidate()
+}
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AlarmLists(
+    state: HomeViewModel.State,
+    onToggleAlarmEnabled: (String, Boolean) -> Unit,
+    onEditAlarm: (SunAlarm?, SunEventType) -> Unit,
+    onDeleteAlarm: (String) -> Unit,
+    onRestoreAlarm: (SunAlarm) -> Unit,
+    onDuplicateAlarm: (String) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    scope: CoroutineScope
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
+        stickyHeader {
+            AlarmSectionHeader(title = "Sunrise", timeText = state.sunriseTimeText)
+        }
+        items(state.sunriseAlarms, key = { it.id }) { alarm ->
+            AlarmRow(
+                alarm = alarm,
+                onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
+                onEdit = { onEditAlarm(alarm, alarm.type) },
+                onDelete = {
+                    onDeleteAlarm(alarm.id)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Sunrise alarm deleted",
+                            actionLabel = "Undo"
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            onRestoreAlarm(alarm)
+                        }
+                    }
+                },
+                onDuplicate = { onDuplicateAlarm(alarm.id) }
+            )
+        }
+        if (state.sunriseAlarms.isEmpty()) {
+            item {
+                Text(
+                    text = "No alarms yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
+        }
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+        item {
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                thickness = 1.dp
+            )
+        }
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+        stickyHeader {
+            AlarmSectionHeader(title = "Sunset", timeText = state.sunsetTimeText)
+        }
+        items(state.sunsetAlarms, key = { it.id }) { alarm ->
+            AlarmRow(
+                alarm = alarm,
+                onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
+                onEdit = { onEditAlarm(alarm, alarm.type) },
+                onDelete = {
+                    onDeleteAlarm(alarm.id)
+                    scope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "Sunset alarm deleted",
+                            actionLabel = "Undo"
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            onRestoreAlarm(alarm)
+                        }
+                    }
+                },
+                onDuplicate = { onDuplicateAlarm(alarm.id) }
+            )
+        }
+        if (state.sunsetAlarms.isEmpty()) {
+            item {
+                Text(
+                    text = "No alarms yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Loading…",
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
 }
