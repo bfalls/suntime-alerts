@@ -99,4 +99,31 @@ class SunTimesCalculator {
         if (result < 0) result += 360.0
         return result
     }
+
+    companion object {
+        fun sunApparentEclipticLongitude(time: ZonedDateTime): Double {
+            val jd = julianDay(time)
+            val jc = (jd - 2451545.0) / 36525.0
+            val geomMeanLongSun = normalizeAngleDeg(280.46646 + jc * (36000.76983 + 0.0003032 * jc))
+            val geomMeanAnomalySun = 357.52911 + jc * (35999.05029 - 0.0001537 * jc)
+            val eccentEarthOrbit = 0.016708634 - jc * (0.000042037 + 0.0000001267 * jc)
+            val sunEqOfCenter = sin(Math.toRadians(geomMeanAnomalySun)) * (1.914602 - jc * (0.004817 + 0.000014 * jc)) + sin(
+                Math.toRadians(2 * geomMeanAnomalySun)
+            ) * (0.019993 - 0.000101 * jc) + sin(Math.toRadians(3 * geomMeanAnomalySun)) * 0.000289
+            val sunTrueLong = geomMeanLongSun + sunEqOfCenter
+            val omega = 125.04 - 1934.136 * jc
+            val sunAppLong = sunTrueLong - 0.00569 - 0.00478 * sin(Math.toRadians(omega))
+            return normalizeAngleDeg(sunAppLong)
+        }
+
+        private fun julianDay(dateTime: ZonedDateTime): Double {
+            return dateTime.toInstant().toEpochMilli() / 86400000.0 + 2440587.5
+        }
+
+        private fun normalizeAngleDeg(angle: Double): Double {
+            var result = angle % 360.0
+            if (result < 0) result += 360.0
+            return result
+        }
+    }
 }
