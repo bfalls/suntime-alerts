@@ -13,10 +13,12 @@ import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.domain.service.MoonEphemeris
 import com.bfalls.suntimealerts.alarm.domain.service.MoonTimesCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator.SunTimes
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import android.util.Log
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -51,6 +53,7 @@ class HomeViewModel(
         val moonMaxAltDeg: Double = 0.0,
         val moonIllumination01: Double = 0.0,
         val moonIsWaxing: Boolean = true,
+        val now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault()),
         val error: String? = null
     )
 
@@ -139,57 +142,49 @@ class HomeViewModel(
         }
     }
 
+    fun refreshSunMoonPositions() {
+        viewModelScope.launch {
+            refreshAstronomyState()
+        }
+    }
+
     private suspend fun loadState() {
-        val settings = settingsStore.load()
-        val zoneId = ZoneId.systemDefault()
-        val placeholderSunTimes = sunTimesCalculator.calculateSunTimes(
-            LocalDate.now(zoneId),
-            settings.fixedLocation ?: Coordinate(0.0, 0.0),
-            zoneId
-        )
-
-        _state.update { current ->
-            current.copy(
-                sunriseTime = placeholderSunTimes.sunrise,
-                sunsetTime = placeholderSunTimes.sunset,
-                sunriseTimeText = formatTime(placeholderSunTimes.sunrise, settings.timeFormat24h),
-                sunsetTimeText = formatTime(placeholderSunTimes.sunset, settings.timeFormat24h)
+        try {
+            val settings = settingsStore.load()
+            val zoneId = ZoneId.systemDefault()
+            val placeholderSunTimes = sunTimesCalculator.calculateSunTimes(
+                LocalDate.now(zoneId),
+                settings.fixedLocation ?: Coordinate(0.0, 0.0),
+                zoneId
             )
-        }
 
-        cachedSettings = settings
-        val alarms = settings.alarms.ifEmpty { settingsStore.loadAlarms() }
-        if (settings.alarms.isEmpty()) {
-            settingsStore.saveAlarms(alarms)
-        }
-        val coordinate = resolveCoordinate(settings)
-        val coordinateUsed = coordinate
-        val sunTimes = coordinate?.let {
-            sunTimesCalculator.calculateSunTimes(LocalDate.now(zoneId), it, zoneId)
-        } ?: placeholderSunTimes
-        val now = ZonedDateTime.now(zoneId)
-        val moonWindow = coordinate?.let {
-            MoonTimesCalculator.computeWindow(now, it.latitude, it.longitude)
-        }
-        val moonPhase = MoonEphemeris.moonPhase(now)
-        _state.value = State(
-            isLoading = false,
-            coordinateUsed = coordinateUsed,
-            sunriseTime = sunTimes?.sunrise,
-            sunsetTime = sunTimes?.sunset,
-            sunriseTimeText = formatTime(sunTimes?.sunrise, settings.timeFormat24h),
-            sunsetTimeText = formatTime(sunTimes?.sunset, settings.timeFormat24h),
-            sunriseAlarms = alarms.filter { it.type == SunEventType.SUNRISE }.sortedBy { it.offsetMinutes },
-            sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes },
-            moonRiseTime = moonWindow?.rise,
-            moonSetTime = moonWindow?.set,
-            moonMaxAltDeg = moonWindow?.maxAltDeg ?: 0.0,
-            moonIllumination01 = moonPhase.illumination01,
-            moonIsWaxing = moonPhase.isWaxing,
-            error = if (coordinate == null) "Location unavailable" else null
-        )
+            _state.update { current ->
+                current.copy(
+                    sunriseTime = placeholderSunTimes.sunrise,
+                    sunsetTime = placeholderSunTimes.sunset,
+                    sunriseTimeText = formatTime(placeholderSunTimes.sunrise, settings.timeFormat24h),
+                    sunsetTimeText = formatTime(placeholderSunTimes.sunset, settings.timeFormat24h)
+                )
+            }
 
-        scheduleForCurrentSettings()
+            cachedSettings = settings
+            val alarms = settings.alarms.ifEmpty { settingsStore.loadAlarms() }
+            if (settings.alarms.isEmpty()) {
+                settingsStore.saveAlarms(alarms)
+            }
+
+            refreshAstronomyState(settings = settings, alarms = alarms, placeholderSunTimes = placeholderSunTimes)
+
+            scheduleForCurrentSettings()
+        } catch (t: Throwable) {
+            Log.e("HomeViewModel", "Failed to load state.", t)
+            _state.update { current ->
+                current.copy(
+                    isLoading = false,
+                    error = "Failed to load settings"
+                )
+            }
+        }
     }
 
     private fun formatTime(dateTime: ZonedDateTime?, use24h: Boolean): String? {
@@ -206,6 +201,49 @@ class HomeViewModel(
             sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes }
         )
         scheduleForCurrentSettings()
+    }
+
+    private suspend fun refreshAstronomyState(
+        settings: UserSettings? = null,
+        alarms: List<SunAlarm>? = null,
+        placeholderSunTimes: SunTimes? = null
+    ) {
+        val resolvedSettings = settings ?: cachedSettings ?: settingsStore.load().also { cachedSettings = it }
+        val zoneId = ZoneId.systemDefault()
+        val coordinate = resolveCoordinate(resolvedSettings)
+        val sunTimes = coordinate?.let {
+            sunTimesCalculator.calculateSunTimes(LocalDate.now(zoneId), it, zoneId)
+        } ?: placeholderSunTimes
+        val now = ZonedDateTime.now(zoneId)
+        val moonWindow = coordinate?.let {
+            MoonTimesCalculator.computeWindow(now, it.latitude, it.longitude)
+        }
+        val moonPhase = MoonEphemeris.moonPhase(now)
+        val sunriseTime = sunTimes?.sunrise ?: _state.value.sunriseTime ?: fallbackSunTimes.sunrise
+        val sunsetTime = sunTimes?.sunset ?: _state.value.sunsetTime ?: fallbackSunTimes.sunset
+        val sunriseAlarms = alarms?.filter { it.type == SunEventType.SUNRISE }?.sortedBy { it.offsetMinutes }
+            ?: _state.value.sunriseAlarms
+        val sunsetAlarms = alarms?.filter { it.type == SunEventType.SUNSET }?.sortedBy { it.offsetMinutes }
+            ?: _state.value.sunsetAlarms
+        _state.update { current ->
+            current.copy(
+                isLoading = false,
+                coordinateUsed = coordinate ?: current.coordinateUsed,
+                sunriseTime = sunriseTime,
+                sunsetTime = sunsetTime,
+                sunriseTimeText = formatTime(sunriseTime, resolvedSettings.timeFormat24h),
+                sunsetTimeText = formatTime(sunsetTime, resolvedSettings.timeFormat24h),
+                sunriseAlarms = sunriseAlarms,
+                sunsetAlarms = sunsetAlarms,
+                moonRiseTime = moonWindow?.rise ?: current.moonRiseTime,
+                moonSetTime = moonWindow?.set ?: current.moonSetTime,
+                moonMaxAltDeg = moonWindow?.maxAltDeg ?: current.moonMaxAltDeg,
+                moonIllumination01 = moonPhase.illumination01,
+                moonIsWaxing = moonPhase.isWaxing,
+                now = now,
+                error = if (coordinate == null) "Location unavailable" else null
+            )
+        }
     }
 
     private suspend fun scheduleForCurrentSettings() {

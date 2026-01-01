@@ -73,6 +73,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
@@ -83,6 +84,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.bfalls.suntimealerts.R
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
@@ -94,9 +97,9 @@ import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunXY
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
-import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -113,6 +116,18 @@ private fun Modifier.moonVisible(isVisible: Boolean): Modifier = semantics {
 @Composable
 fun HomeScreen(viewModel: HomeViewModel) {
     val state by viewModel.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.refreshSunMoonPositions()
+            while (true) {
+                delay(15 * 60 * 1000L)
+                viewModel.refreshSunMoonPositions()
+            }
+        }
+    }
+
     HomeScreenContent(
         state = state,
         onAddAlarm = viewModel::addAlarm,
@@ -161,7 +176,8 @@ fun HomeScreenContent(
                     moonIllumination01 = state.moonIllumination01,
                     moonIsWaxing = state.moonIsWaxing,
                     coordinateUsed = state.coordinateUsed,
-                    sunTimesResolved = readyToRender
+                    sunTimesResolved = readyToRender,
+                    now = state.now
                 )
             }
         },
@@ -567,7 +583,8 @@ private fun SkyTopBar(
     moonIllumination01: Double,
     moonIsWaxing: Boolean,
     coordinateUsed: Coordinate?,
-    sunTimesResolved: Boolean
+    sunTimesResolved: Boolean,
+    now: ZonedDateTime
 ) {
     Box(
         modifier = Modifier
@@ -584,6 +601,7 @@ private fun SkyTopBar(
             moonIsWaxing = moonIsWaxing,
             coordinateUsed = coordinateUsed,
             sunTimesResolved = sunTimesResolved,
+            now = now,
             modifier = Modifier
                 .matchParentSize()
                 .testTag("sky_appbar_background")
@@ -611,14 +629,14 @@ private fun SkyAppBarBackground(
     moonIsWaxing: Boolean,
     coordinateUsed: Coordinate?,
     sunTimesResolved: Boolean,
+    now: ZonedDateTime,
     modifier: Modifier = Modifier
 ) {
-    val zone = sunrise?.zone ?: sunset?.zone ?: ZoneId.systemDefault()
-    val now = ZonedDateTime.now(zone)
     val hasSunTimes = sunTimesResolved && sunrise != null && sunset != null
     val moonWindowComplete = coordinateUsed != null && moonRise != null && moonSet != null && moonRise.isBefore(moonSet)
     val moonIsAboveHorizon = moonWindowComplete && !now.isBefore(moonRise) && !now.isAfter(moonSet)
     val moonImage: ImageBitmap = ImageBitmap.imageResource(id = R.drawable.moon_full)
+    val sunImage: ImageBitmap = ImageBitmap.imageResource(id = R.drawable.sun)
     val placeholderTop = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
     val placeholderBottom = MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp)
     Canvas(modifier = modifier.moonVisible(moonIsAboveHorizon)) {
@@ -760,10 +778,16 @@ private fun SkyAppBarBackground(
         }
 
         if (isDay) {
-            drawCircle(
-                color = Color(0xFFFFD54F),
-                radius = size.minDimension * 0.06f,
-                center = Offset(sunPosition.x, sunPosition.y)
+            val sunBaseDiameter = size.minDimension * 0.12f
+            val minSunSize = 24.dp.toPx()
+            val maxSunSize = 40.dp.toPx()
+            val sunDiameter = sunBaseDiameter.coerceIn(minSunSize, maxSunSize)
+            val sunRadius = sunDiameter / 2f
+            val topLeft = Offset(sunPosition.x - sunRadius, sunPosition.y - sunRadius)
+            drawImage(
+                image = sunImage,
+                dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt()),
+                dstSize = IntSize(sunDiameter.roundToInt(), sunDiameter.roundToInt())
             )
         }
     }
