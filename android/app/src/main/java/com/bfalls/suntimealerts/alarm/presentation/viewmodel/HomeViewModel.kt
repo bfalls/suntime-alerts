@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import android.util.Log
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -148,32 +149,42 @@ class HomeViewModel(
     }
 
     private suspend fun loadState() {
-        val settings = settingsStore.load()
-        val zoneId = ZoneId.systemDefault()
-        val placeholderSunTimes = sunTimesCalculator.calculateSunTimes(
-            LocalDate.now(zoneId),
-            settings.fixedLocation ?: Coordinate(0.0, 0.0),
-            zoneId
-        )
-
-        _state.update { current ->
-            current.copy(
-                sunriseTime = placeholderSunTimes.sunrise,
-                sunsetTime = placeholderSunTimes.sunset,
-                sunriseTimeText = formatTime(placeholderSunTimes.sunrise, settings.timeFormat24h),
-                sunsetTimeText = formatTime(placeholderSunTimes.sunset, settings.timeFormat24h)
+        try {
+            val settings = settingsStore.load()
+            val zoneId = ZoneId.systemDefault()
+            val placeholderSunTimes = sunTimesCalculator.calculateSunTimes(
+                LocalDate.now(zoneId),
+                settings.fixedLocation ?: Coordinate(0.0, 0.0),
+                zoneId
             )
+
+            _state.update { current ->
+                current.copy(
+                    sunriseTime = placeholderSunTimes.sunrise,
+                    sunsetTime = placeholderSunTimes.sunset,
+                    sunriseTimeText = formatTime(placeholderSunTimes.sunrise, settings.timeFormat24h),
+                    sunsetTimeText = formatTime(placeholderSunTimes.sunset, settings.timeFormat24h)
+                )
+            }
+
+            cachedSettings = settings
+            val alarms = settings.alarms.ifEmpty { settingsStore.loadAlarms() }
+            if (settings.alarms.isEmpty()) {
+                settingsStore.saveAlarms(alarms)
+            }
+
+            refreshAstronomyState(settings = settings, alarms = alarms, placeholderSunTimes = placeholderSunTimes)
+
+            scheduleForCurrentSettings()
+        } catch (t: Throwable) {
+            Log.e("HomeViewModel", "Failed to load state.", t)
+            _state.update { current ->
+                current.copy(
+                    isLoading = false,
+                    error = "Failed to load settings"
+                )
+            }
         }
-
-        cachedSettings = settings
-        val alarms = settings.alarms.ifEmpty { settingsStore.loadAlarms() }
-        if (settings.alarms.isEmpty()) {
-            settingsStore.saveAlarms(alarms)
-        }
-
-        refreshAstronomyState(settings = settings, alarms = alarms, placeholderSunTimes = placeholderSunTimes)
-
-        scheduleForCurrentSettings()
     }
 
     private fun formatTime(dateTime: ZonedDateTime?, use24h: Boolean): String? {

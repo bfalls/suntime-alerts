@@ -1,6 +1,7 @@
 package com.bfalls.suntimealerts.alarm.data
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -116,7 +117,12 @@ class SettingsStore(private val context: Context) : SettingsRepository {
         val json = prefs[alarmsJson] ?: return emptyList()
         if (json.isBlank()) return emptyList()
         val type = object : TypeToken<List<SunAlarm>>() {}.type
-        return gson.fromJson(json, type) ?: emptyList()
+        return try {
+            gson.fromJson<List<SunAlarm>>(json, type) ?: emptyList()
+        } catch (t: Throwable) {
+            Log.w("SettingsStore", "Failed to parse alarmsJson; falling back to defaults.", t)
+            emptyList()
+        }
     }
 
     private fun migrateAlarms(prefs: Preferences): List<SunAlarm> = migrateLegacyAlarms(

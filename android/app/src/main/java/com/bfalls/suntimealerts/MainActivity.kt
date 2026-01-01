@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity() {
             val cityImportState by cityImportViewModel.state.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
+            var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var hasEnabledAlarms by remember { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
             var exactAlarmPermissionDialogReason by rememberSaveable { mutableStateOf<String?>(null) }
@@ -245,6 +246,7 @@ class MainActivity : ComponentActivity() {
                         onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
                     } else {
                         // Ask the system for permission
+                        autoLocationPermissionRequested = true
                         permissionRequestOrigin = PermissionRequestOrigin.AUTOMATIC
                         locationPermissionLauncher.launch(
                             arrayOf(
@@ -253,6 +255,34 @@ class MainActivity : ComponentActivity() {
                             )
                         )
                     }
+                }
+            }
+
+            LaunchedEffect(
+                onboardingState.isLoaded,
+                onboardingState.onboardingComplete,
+                onboardingState.locationMode,
+                onboardingState.locationPermissionPermanentlyDenied,
+                autoLocationPermissionRequested,
+                permissionRequestOrigin
+            ) {
+                if (
+                    onboardingState.isLoaded &&
+                    onboardingState.onboardingComplete &&
+                    onboardingState.locationMode == LocationMode.DEVICE &&
+                    !onboardingState.locationPermissionPermanentlyDenied &&
+                    permissionRequestOrigin == null &&
+                    !autoLocationPermissionRequested &&
+                    !hasLocationPermission(context)
+                ) {
+                    autoLocationPermissionRequested = true
+                    permissionRequestOrigin = PermissionRequestOrigin.AUTOMATIC
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
                 }
             }
 
