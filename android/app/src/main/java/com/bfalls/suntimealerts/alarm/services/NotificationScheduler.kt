@@ -263,11 +263,20 @@ class SunEventReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val appOps = context.getSystemService(AppOpsManager::class.java)
             val op = "android:use_full_screen_intent" // constant not available pre-Upside Down Cake in older SDKs
-            val mode = appOps.checkOpNoThrow(
-                op,
-                context.applicationInfo.uid,
-                context.packageName
-            )
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                appOps.unsafeCheckOpNoThrow(
+                    op,
+                    context.applicationInfo.uid,
+                    context.packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    op,
+                    context.applicationInfo.uid,
+                    context.packageName
+                )
+            }
             if (mode != AppOpsManager.MODE_ALLOWED) {
                 Log.w(
                     "SunEventReceiver",

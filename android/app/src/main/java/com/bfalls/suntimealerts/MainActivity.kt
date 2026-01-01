@@ -42,7 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -384,7 +384,7 @@ class MainActivity : ComponentActivity() {
                                 Text(text = "Preparing Suntime Alerts…", color = TextPrimary)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 CircularProgressIndicator(
-                                    progress = cityImportState.progress
+                                    progress = { cityImportState.progress }
                                 )
                                 if (cityImportState.total > 0) {
                                     Spacer(modifier = Modifier.height(8.dp))
