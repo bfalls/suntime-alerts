@@ -1,7 +1,9 @@
 package com.bfalls.suntimealerts.alarm.presentation.ui
 
+import android.annotation.SuppressLint
 import android.graphics.Paint
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.widget.EditText
 import android.widget.NumberPicker
 import androidx.annotation.VisibleForTesting
@@ -825,6 +827,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStars(
     }
 }
 
+@SuppressLint("SoonBlockedPrivateApi")
 private fun styleNumberPicker(
     numberPicker: NumberPicker,
     textColor: Color,
@@ -837,20 +840,22 @@ private fun styleNumberPicker(
             child.setTextColor(textColorInt)
         }
     }
-    try {
-        val selectorWheelPaintField = NumberPicker::class.java.getDeclaredField("mSelectorWheelPaint")
-        selectorWheelPaintField.isAccessible = true
-        val paint = selectorWheelPaintField.get(numberPicker) as Paint
-        paint.color = textColorInt
-    } catch (_: Exception) {
-        // Best-effort styling for OEM variations.
-    }
-    try {
-        val selectionDividerField = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
-        selectionDividerField.isAccessible = true
-        selectionDividerField.set(numberPicker, ColorDrawable(dividerColor.toArgb()))
-    } catch (_: Exception) {
-        // Ignore if the field is not available.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        try {
+            val selectorWheelPaintField = NumberPicker::class.java.getDeclaredField("mSelectorWheelPaint")
+            selectorWheelPaintField.isAccessible = true
+            val paint = selectorWheelPaintField.get(numberPicker) as Paint
+            paint.color = textColorInt
+        } catch (_: Exception) {
+            // Best-effort styling for OEM variations.
+        }
+        try {
+            val selectionDividerField = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
+            selectionDividerField.isAccessible = true
+            selectionDividerField.set(numberPicker, ColorDrawable(dividerColor.toArgb()))
+        } catch (_: Exception) {
+            // Ignore if the field is not available.
+        }
     }
     numberPicker.invalidate()
 }
