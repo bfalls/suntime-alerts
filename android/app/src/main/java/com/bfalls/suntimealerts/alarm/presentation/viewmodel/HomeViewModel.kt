@@ -123,10 +123,14 @@ class HomeViewModel(
         }
     }
 
-    fun restoreAlarm(alarm: SunAlarm) {
+    fun restoreAlarm(alarm: SunAlarm, index: Int) {
         viewModelScope.launch {
             val existing = _state.value.allAlarms().filterNot { it.id == alarm.id }
-            persistAlarms(existing + alarm)
+            val insertIndex = index.coerceIn(0, existing.size)
+            val updated = existing.toMutableList().apply {
+                add(insertIndex, alarm)
+            }
+            persistAlarms(updated)
         }
     }
 
