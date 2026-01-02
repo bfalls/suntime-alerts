@@ -11,6 +11,7 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.EditText
 import android.widget.NumberPicker
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.VisibleForTesting
@@ -37,15 +38,18 @@ import androidx.compose.foundation.lazy.items
 //import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -166,7 +170,7 @@ fun HomeScreenContent(
     onUpdateAlarm: (SunAlarm) -> Unit,
     onToggleAlarmEnabled: (String, Boolean) -> Unit,
     onDeleteAlarm: (String) -> Unit,
-    onDuplicateAlarm: (String) -> Unit,
+    onDuplicateAlarm: (SunAlarm) -> Unit,
     onRestoreAlarm: (SunAlarm) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -182,6 +186,25 @@ fun HomeScreenContent(
     }
     val hasSunTimes = state.sunriseTime != null && state.sunsetTime != null
     val readyToRender = !state.isLoading && hasSunTimes
+    val typeLabel: (SunAlarm) -> String = { alarm -> if (alarm.type == SunEventType.SUNRISE) "Sunrise" else "Sunset" }
+    val handleDelete: (SunAlarm) -> Unit = { alarm ->
+        onDeleteAlarm(alarm.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = "${typeLabel(alarm)} alarm deleted",
+                actionLabel = "Undo"
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                onRestoreAlarm(alarm)
+            }
+        }
+    }
+    val handleDuplicate: (SunAlarm) -> Unit = { alarm ->
+        onDuplicateAlarm(alarm)
+        scope.launch {
+            snackbarHostState.showSnackbar("${typeLabel(alarm)} alarm duplicated")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -234,20 +257,7 @@ fun HomeScreenContent(
                         AlarmRow(
                             alarm = alarm,
                             onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                            onEdit = { openSheet(alarm, alarm.type) },
-                            onDelete = {
-                                onDeleteAlarm(alarm.id)
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "Sunrise alarm deleted",
-                                        actionLabel = "Undo"
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        onRestoreAlarm(alarm)
-                                    }
-                                }
-                            },
-                            onDuplicate = { onDuplicateAlarm(alarm.id) }
+                            onEdit = { openSheet(alarm, alarm.type) }
                         )
                     }
                     if (state.sunriseAlarms.isEmpty()) {
@@ -274,20 +284,7 @@ fun HomeScreenContent(
                         AlarmRow(
                             alarm = alarm,
                             onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                            onEdit = { openSheet(alarm, alarm.type) },
-                            onDelete = {
-                                onDeleteAlarm(alarm.id)
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "Sunset alarm deleted",
-                                        actionLabel = "Undo"
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        onRestoreAlarm(alarm)
-                                    }
-                                }
-                            },
-                            onDuplicate = { onDuplicateAlarm(alarm.id) }
+                            onEdit = { openSheet(alarm, alarm.type) }
                         )
                     }
                     if (state.sunsetAlarms.isEmpty()) {
@@ -315,6 +312,14 @@ fun HomeScreenContent(
                 } else {
                     onUpdateAlarm(alarm)
                 }
+                showSheet = false
+            },
+            onDelete = { alarm ->
+                handleDelete(alarm)
+                showSheet = false
+            },
+            onDuplicate = { alarm ->
+                handleDuplicate(alarm)
                 showSheet = false
             }
         )
@@ -352,9 +357,7 @@ private fun AlarmSectionHeader(
 private fun AlarmRow(
     alarm: SunAlarm,
     onToggle: (Boolean) -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onDuplicate: () -> Unit
+    onEdit: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -379,12 +382,6 @@ private fun AlarmRow(
             modifier = Modifier.align(Alignment.CenterEnd),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onDuplicate) {
-                Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate alarm")
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete alarm")
-            }
             Switch(
                 checked = alarm.enabled,
                 onCheckedChange = onToggle
@@ -393,26 +390,95 @@ private fun AlarmRow(
     }
 }
 
+private data class AlarmEditorValues(
+    val type: SunEventType,
+    val isAfter: Boolean,
+    val hours: Int,
+    val minutes: Int,
+    val label: String,
+    val enabled: Boolean,
+    val recurrenceMask: Int,
+    val soundUriValue: String?,
+    val vibrate: Boolean
+) {
+    fun toAlarm(existing: SunAlarm?): SunAlarm {
+        val totalMinutes = hours * 60 + minutes
+        val offset = if (isAfter) totalMinutes else -totalMinutes
+        return existing?.copy(
+            type = type,
+            offsetMinutes = offset,
+            label = label,
+            enabled = enabled,
+            recurrenceDays = recurrenceMask,
+            soundUri = soundUriValue,
+            vibrate = vibrate
+        ) ?: SunAlarm(
+            type = type,
+            offsetMinutes = offset,
+            label = label,
+            enabled = enabled,
+            recurrenceDays = recurrenceMask,
+            soundUri = soundUriValue,
+            vibrate = vibrate
+        )
+    }
+}
+
+private fun initialAlarmValues(alarm: SunAlarm?, defaultType: SunEventType): AlarmEditorValues {
+    val offset = alarm?.offsetMinutes ?: 0
+    return AlarmEditorValues(
+        type = alarm?.type ?: defaultType,
+        isAfter = offset >= 0,
+        hours = abs(offset) / 60,
+        minutes = abs(offset) % 60,
+        label = alarm?.label ?: "",
+        enabled = alarm?.enabled ?: true,
+        recurrenceMask = alarm?.recurrenceDays ?: ALL_DAYS_MASK,
+        soundUriValue = alarm?.soundUri,
+        vibrate = alarm?.vibrate ?: true
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlarmEditorSheet(
     initialAlarm: SunAlarm?,
     defaultType: SunEventType,
     onDismiss: () -> Unit,
-    onSave: (SunAlarm) -> Unit
+    onSave: (SunAlarm) -> Unit,
+    onDelete: (SunAlarm) -> Unit,
+    onDuplicate: (SunAlarm) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scrollState = rememberScrollState()
-    var type by rememberSaveable { mutableStateOf(initialAlarm?.type ?: defaultType) }
-    var isAfter by rememberSaveable { mutableStateOf((initialAlarm?.offsetMinutes ?: 0) >= 0) }
-    var hours by rememberSaveable { mutableStateOf(abs(initialAlarm?.offsetMinutes ?: 0) / 60) }
-    var minutes by rememberSaveable { mutableStateOf(abs(initialAlarm?.offsetMinutes ?: 0) % 60) }
-    var label by rememberSaveable { mutableStateOf(initialAlarm?.label ?: "") }
-    var enabled by rememberSaveable { mutableStateOf(initialAlarm?.enabled ?: true) }
-    var recurrenceMask by rememberSaveable { mutableStateOf(initialAlarm?.recurrenceDays ?: ALL_DAYS_MASK) }
-    var soundUriValue by rememberSaveable { mutableStateOf(initialAlarm?.soundUri) }
-    var vibrate by rememberSaveable { mutableStateOf(initialAlarm?.vibrate ?: true) }
+    val initialValues = remember(initialAlarm?.id, defaultType) {
+        initialAlarmValues(initialAlarm, defaultType)
+    }
+    var type by rememberSaveable { mutableStateOf(initialValues.type) }
+    var isAfter by rememberSaveable { mutableStateOf(initialValues.isAfter) }
+    var hours by rememberSaveable { mutableStateOf(initialValues.hours) }
+    var minutes by rememberSaveable { mutableStateOf(initialValues.minutes) }
+    var label by rememberSaveable { mutableStateOf(initialValues.label) }
+    var enabled by rememberSaveable { mutableStateOf(initialValues.enabled) }
+    var recurrenceMask by rememberSaveable { mutableStateOf(initialValues.recurrenceMask) }
+    var soundUriValue by rememberSaveable { mutableStateOf(initialValues.soundUriValue) }
+    var vibrate by rememberSaveable { mutableStateOf(initialValues.vibrate) }
     val context = LocalContext.current
+    var showDiscardDialog by remember { mutableStateOf(false) }
+    val currentValues = AlarmEditorValues(
+        type = type,
+        isAfter = isAfter,
+        hours = hours,
+        minutes = minutes,
+        label = label,
+        enabled = enabled,
+        recurrenceMask = recurrenceMask,
+        soundUriValue = soundUriValue,
+        vibrate = vibrate
+    )
+    val hasEdits = currentValues != initialValues
+    val isInputValid = true
+    val canSave = (initialAlarm == null || hasEdits) && isInputValid
     val ringtoneLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -431,20 +497,30 @@ private fun AlarmEditorSheet(
     }
 
     LaunchedEffect(initialAlarm?.id, defaultType) {
-        type = initialAlarm?.type ?: defaultType
-        val offset = initialAlarm?.offsetMinutes ?: 0
-        isAfter = offset >= 0
-        hours = abs(offset) / 60
-        minutes = abs(offset) % 60
-        label = initialAlarm?.label ?: ""
-        enabled = initialAlarm?.enabled ?: true
-        recurrenceMask = initialAlarm?.recurrenceDays ?: ALL_DAYS_MASK
-        soundUriValue = initialAlarm?.soundUri
-        vibrate = initialAlarm?.vibrate ?: true
+        val updatedInitial = initialAlarmValues(initialAlarm, defaultType)
+        type = updatedInitial.type
+        isAfter = updatedInitial.isAfter
+        hours = updatedInitial.hours
+        minutes = updatedInitial.minutes
+        label = updatedInitial.label
+        enabled = updatedInitial.enabled
+        recurrenceMask = updatedInitial.recurrenceMask
+        soundUriValue = updatedInitial.soundUriValue
+        vibrate = updatedInitial.vibrate
     }
 
+    val handleCancel = {
+        if (hasEdits) {
+            showDiscardDialog = true
+        } else {
+            onDismiss()
+        }
+    }
+
+    BackHandler { handleCancel() }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleCancel,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp),
         contentColor = MaterialTheme.colorScheme.onSurface
@@ -613,44 +689,70 @@ private fun AlarmEditorSheet(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Cancel")
+                    IconButton(onClick = handleCancel) {
+                        Icon(Icons.Default.Close, contentDescription = "Cancel")
+                    }
+                    if (initialAlarm != null) {
+                        IconButton(
+                            onClick = {
+                                onDelete(initialAlarm)
+                                onDismiss()
+                            },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete alarm")
+                        }
+                        IconButton(
+                            onClick = {
+                                onDuplicate(currentValues.toAlarm(initialAlarm))
+                                onDismiss()
+                            }
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate alarm")
+                        }
+                    }
                 }
+                Spacer(modifier = Modifier.weight(1f))
                 Button(
                     onClick = {
-                        val totalMinutes = hours * 60 + minutes
-                        val offset = if (isAfter) totalMinutes else -totalMinutes
-                        val updated = initialAlarm?.copy(
-                            type = type,
-                            offsetMinutes = offset,
-                            label = label,
-                            enabled = enabled,
-                            recurrenceDays = recurrenceMask,
-                            soundUri = soundUriValue,
-                            vibrate = vibrate
-                        ) ?: SunAlarm(
-                            type = type,
-                            offsetMinutes = offset,
-                            label = label,
-                            enabled = enabled,
-                            recurrenceDays = recurrenceMask,
-                            soundUri = soundUriValue,
-                            vibrate = vibrate
-                        )
-                        onSave(updated)
+                        onSave(currentValues.toAlarm(initialAlarm))
+                        onDismiss()
                     },
-                    modifier = Modifier.weight(1f)
+                    enabled = canSave
                 ) {
                     Text("Save")
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard changes?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardDialog = false
+                    onDismiss()
+                }) {
+                    Text("Discard")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text("Keep editing")
+                }
+            }
+        )
     }
 }
 
@@ -1004,7 +1106,7 @@ private fun AlarmLists(
     onEditAlarm: (SunAlarm?, SunEventType) -> Unit,
     onDeleteAlarm: (String) -> Unit,
     onRestoreAlarm: (SunAlarm) -> Unit,
-    onDuplicateAlarm: (String) -> Unit,
+    onDuplicateAlarm: (SunAlarm) -> Unit,
     snackbarHostState: SnackbarHostState,
     scope: CoroutineScope
 ) {
@@ -1019,20 +1121,7 @@ private fun AlarmLists(
             AlarmRow(
                 alarm = alarm,
                 onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                onEdit = { onEditAlarm(alarm, alarm.type) },
-                onDelete = {
-                    onDeleteAlarm(alarm.id)
-                    scope.launch {
-                        val result = snackbarHostState.showSnackbar(
-                            message = "Sunrise alarm deleted",
-                            actionLabel = "Undo"
-                        )
-                        if (result == SnackbarResult.ActionPerformed) {
-                            onRestoreAlarm(alarm)
-                        }
-                    }
-                },
-                onDuplicate = { onDuplicateAlarm(alarm.id) }
+                onEdit = { onEditAlarm(alarm, alarm.type) }
             )
         }
         if (state.sunriseAlarms.isEmpty()) {
@@ -1059,20 +1148,7 @@ private fun AlarmLists(
             AlarmRow(
                 alarm = alarm,
                 onToggle = { enabled -> onToggleAlarmEnabled(alarm.id, enabled) },
-                onEdit = { onEditAlarm(alarm, alarm.type) },
-                onDelete = {
-                    onDeleteAlarm(alarm.id)
-                    scope.launch {
-                        val result = snackbarHostState.showSnackbar(
-                            message = "Sunset alarm deleted",
-                            actionLabel = "Undo"
-                        )
-                        if (result == SnackbarResult.ActionPerformed) {
-                            onRestoreAlarm(alarm)
-                        }
-                    }
-                },
-                onDuplicate = { onDuplicateAlarm(alarm.id) }
+                onEdit = { onEditAlarm(alarm, alarm.type) }
             )
         }
         if (state.sunsetAlarms.isEmpty()) {

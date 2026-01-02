@@ -106,15 +106,20 @@ class HomeViewModel(
         }
     }
 
-    fun duplicateAlarm(id: String) {
+    fun duplicateAlarm(alarm: SunAlarm) {
         viewModelScope.launch {
             val current = _state.value.allAlarms()
-            val toCopy = current.firstOrNull { it.id == id } ?: return@launch
-            val copy = toCopy.copy(
+            val sourceIndex = current.indexOfFirst { it.id == alarm.id }
+            val baseAlarm = current.firstOrNull { it.id == alarm.id } ?: alarm
+            val copy = baseAlarm.copy(
                 id = UUID.randomUUID().toString(),
-                label = if (toCopy.label.isNotBlank()) "${toCopy.label} (copy)" else toCopy.label
+                label = if (baseAlarm.label.isNotBlank()) "${baseAlarm.label} (copy)" else baseAlarm.label
             )
-            persistAlarms(current + copy)
+            val updated = current.toMutableList().apply {
+                val insertIndex = if (sourceIndex >= 0) sourceIndex + 1 else size
+                add(insertIndex, copy)
+            }
+            persistAlarms(updated)
         }
     }
 
