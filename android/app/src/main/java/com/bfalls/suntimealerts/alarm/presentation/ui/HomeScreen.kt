@@ -59,6 +59,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -171,7 +172,7 @@ fun HomeScreenContent(
     onToggleAlarmEnabled: (String, Boolean) -> Unit,
     onDeleteAlarm: (String) -> Unit,
     onDuplicateAlarm: (SunAlarm) -> Unit,
-    onRestoreAlarm: (SunAlarm) -> Unit
+    onRestoreAlarm: (SunAlarm, Int) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -188,14 +189,17 @@ fun HomeScreenContent(
     val readyToRender = !state.isLoading && hasSunTimes
     val typeLabel: (SunAlarm) -> String = { alarm -> if (alarm.type == SunEventType.SUNRISE) "Sunrise" else "Sunset" }
     val handleDelete: (SunAlarm) -> Unit = { alarm ->
+        val deleteIndex = (state.sunriseAlarms + state.sunsetAlarms).indexOfFirst { it.id == alarm.id }
         onDeleteAlarm(alarm.id)
         scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
             val result = snackbarHostState.showSnackbar(
                 message = "${typeLabel(alarm)} alarm deleted",
-                actionLabel = "Undo"
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short
             )
             if (result == SnackbarResult.ActionPerformed) {
-                onRestoreAlarm(alarm)
+                onRestoreAlarm(alarm, deleteIndex)
             }
         }
     }
