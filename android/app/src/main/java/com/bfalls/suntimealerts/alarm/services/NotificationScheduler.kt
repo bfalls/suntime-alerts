@@ -20,13 +20,22 @@ import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.bfalls.suntimealerts.alarm.data.SettingsStore
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
+import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
+import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
+import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.domain.service.AlarmOccurrenceCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import kotlin.math.abs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 interface AlarmScheduler {
     fun schedule(
@@ -35,11 +44,12 @@ interface AlarmScheduler {
         triggerAtMillis: Long,
         zoneId: ZoneId,
         label: String,
-            offsetMinutes: Int,
-            date: LocalDate,
-            soundUri: String?,
-            vibrate: Boolean
-        )
+        offsetMinutes: Int,
+        date: LocalDate,
+        soundUri: String?,
+        vibrate: Boolean,
+        coordinate: Coordinate
+    )
 
     fun cancelAll()
 }
@@ -58,7 +68,8 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
         offsetMinutes: Int,
         date: LocalDate,
         soundUri: String?,
-        vibrate: Boolean
+        vibrate: Boolean,
+        coordinate: Coordinate
     ) {
         val intent = Intent(context, SunEventReceiver::class.java).apply {
             putExtra("type", eventType.name)
@@ -68,6 +79,8 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
             putExtra("zoneId", zoneId.id)
             putExtra("soundUri", soundUri)
             putExtra("vibrate", vibrate)
+            putExtra("latitude", coordinate.latitude)
+            putExtra("longitude", coordinate.longitude)
         }
         val requestCode = requestCode(alarmId, date)
         val pending = PendingIntent.getBroadcast(
@@ -305,6 +318,25 @@ class SunEventReceiver : BroadcastReceiver() {
 
         NotificationManagerCompat.from(context).notify(alarmId.hashCode(), notification)
 
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                val zoneId = intent.getStringExtra("zoneId")?.let { raw ->
+                    runCatching { ZoneId.of(raw) }.getOrDefault(ZoneId.systemDefault())
+                } ?: ZoneId.systemDefault()
+                rescheduleNextOccurrence(
+                    appContext = context.applicationContext,
+                    alarmId = alarmId,
+                    zoneId = zoneId,
+                    sourceIntent = intent
+                )
+            } catch (t: Throwable) {
+                Log.e("SunEventReceiver", "Failed to reschedule next occurrence for alarm $alarmId", t)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val appOps = context.getSystemService(AppOpsManager::class.java)
             val op = "android:use_full_screen_intent" // constant not available pre-Upside Down Cake in older SDKs
@@ -328,6 +360,53 @@ class SunEventReceiver : BroadcastReceiver() {
                     "Full-screen intent not allowed by user/system (mode=$mode). " +
                             "Guide the user to allow full-screen notifications in system settings."
                 )
+            }
+        }
+    }
+
+    private suspend fun rescheduleNextOccurrence(
+        appContext: Context,
+        alarmId: String,
+        zoneId: ZoneId,
+        sourceIntent: Intent
+    ) {
+        val settingsStore = SettingsStore(appContext)
+        val settings = settingsStore.load()
+        val alarm = settings.alarms.firstOrNull { it.id == alarmId && it.enabled }
+        if (alarm == null) {
+            Log.i("SunEventReceiver", "Alarm $alarmId is missing or disabled; skipping reschedule.")
+            return
+        }
+        val coordinate = resolveCoordinate(settings, sourceIntent)
+        if (coordinate == null) {
+            Log.w("SunEventReceiver", "No coordinate available to reschedule alarm $alarmId; skipping.")
+            return
+        }
+
+        val occurrenceCalculator = AlarmOccurrenceCalculator(SunTimesCalculator())
+        val nextOccurrence = occurrenceCalculator.nextOccurrence(alarm, coordinate, zoneId) ?: return
+
+        NotificationScheduler(appContext).schedule(
+            alarmId = alarm.id,
+            eventType = alarm.type,
+            triggerAtMillis = nextOccurrence.triggerAtMillis,
+            zoneId = zoneId,
+            label = alarm.label,
+            offsetMinutes = alarm.offsetMinutes,
+            date = nextOccurrence.date,
+            soundUri = alarm.soundUri,
+            vibrate = alarm.vibrate ?: true,
+            coordinate = coordinate
+        )
+    }
+
+    private fun resolveCoordinate(settings: UserSettings, sourceIntent: Intent): Coordinate? {
+        return when (settings.locationMode) {
+            LocationMode.FIXED -> settings.fixedLocation
+            LocationMode.DEVICE -> {
+                val lat = sourceIntent.getDoubleExtra("latitude", Double.NaN)
+                val lon = sourceIntent.getDoubleExtra("longitude", Double.NaN)
+                if (lat.isFinite() && lon.isFinite()) Coordinate(lat, lon) else null
             }
         }
     }

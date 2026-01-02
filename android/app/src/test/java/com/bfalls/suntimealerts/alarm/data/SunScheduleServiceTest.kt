@@ -60,6 +60,8 @@ class SunScheduleServiceTest {
         val sunTimes = calculator.calculateSunTimes(today, coordinate, zone)
         val expectedTrigger = requireNotNull(sunTimes.sunrise).toInstant().toEpochMilli() + 30 * 60 * 1000L
 
+        assertTrue("Only one occurrence should be scheduled per enabled alarm", notificationScheduler.entries.size == 1)
+
         assertTrue(
             notificationScheduler.entries.any {
                 it.eventType == SunEventType.SUNRISE &&
@@ -99,6 +101,10 @@ class SunScheduleServiceTest {
         val tomorrow = today.plusDays(1)
         val sunTimesTomorrow = calculator.calculateSunTimes(tomorrow, coordinate, zone)
         val expectedTomorrowTrigger = requireNotNull(sunTimesTomorrow.sunrise).toInstant().toEpochMilli()
+        assertTrue(
+            "Should only schedule a single upcoming occurrence",
+            notificationScheduler.entries.size == 1
+        )
         assertFalse(
             "Should not schedule past occurrences for today",
             notificationScheduler.entries.any { entry ->
@@ -141,6 +147,10 @@ class SunScheduleServiceTest {
 
         val today = LocalDate.now(clock)
         val tomorrow = today.plusDays(1)
+        assertTrue(
+            "Should only schedule one pending occurrence for the enabled alarm",
+            notificationScheduler.entries.size == 1
+        )
         assertFalse(
             "Should not schedule on an unselected day (today)",
             notificationScheduler.entries.any { entry ->
@@ -173,7 +183,8 @@ class SunScheduleServiceTest {
             offsetMinutes: Int,
             date: LocalDate,
             soundUri: String?,
-            vibrate: Boolean
+            vibrate: Boolean,
+            coordinate: Coordinate
         ) {
             entries += Entry(alarmId, eventType, triggerAtMillis)
         }
