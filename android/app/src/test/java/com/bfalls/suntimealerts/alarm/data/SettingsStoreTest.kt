@@ -44,7 +44,7 @@ class SettingsStoreTest {
         )
         val normalized = legacyAlarm.withDefaults()
 
-        assertEquals(127, normalized.recurrenceDays)
+        assertEquals(null, normalized.recurrenceDays)
         assertTrue(normalized.vibrate == true)
         assertEquals(null, normalized.soundUri)
     }

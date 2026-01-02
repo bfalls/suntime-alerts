@@ -55,7 +55,6 @@ fun Int.prettyPrintDays(): String {
 }
 
 fun SunAlarm.withDefaults(): SunAlarm = copy(
-    recurrenceDays = recurrenceDays ?: ALL_DAYS_MASK,
     soundUri = soundUri,
     vibrate = vibrate ?: true
 )

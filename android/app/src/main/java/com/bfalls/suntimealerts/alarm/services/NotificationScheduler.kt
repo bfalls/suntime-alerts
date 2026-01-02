@@ -21,11 +21,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.bfalls.suntimealerts.alarm.data.SettingsStore
+import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
-import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.service.AlarmOccurrenceCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import java.time.Instant
@@ -372,9 +373,17 @@ class SunEventReceiver : BroadcastReceiver() {
     ) {
         val settingsStore = SettingsStore(appContext)
         val settings = settingsStore.load()
-        val alarm = settings.alarms.firstOrNull { it.id == alarmId && it.enabled }
+        val alarm = settings.alarms.firstOrNull { it.id == alarmId }
         if (alarm == null) {
-            Log.i("SunEventReceiver", "Alarm $alarmId is missing or disabled; skipping reschedule.")
+            Log.i("SunEventReceiver", "Alarm $alarmId is missing; skipping reschedule.")
+            return
+        }
+        if (!alarm.enabled) {
+            Log.i("SunEventReceiver", "Alarm $alarmId is disabled; skipping reschedule.")
+            return
+        }
+        if (!alarm.isRecurring()) {
+            disableOneShotAlarm(alarmId, settings.alarms, settingsStore)
             return
         }
         val coordinate = resolveCoordinate(settings, sourceIntent)
@@ -398,6 +407,20 @@ class SunEventReceiver : BroadcastReceiver() {
             vibrate = alarm.vibrate ?: true,
             coordinate = coordinate
         )
+    }
+
+    private fun SunAlarm.isRecurring(): Boolean = recurrenceDays != null && recurrenceDays != 0
+
+    private suspend fun disableOneShotAlarm(
+        alarmId: String,
+        alarms: List<SunAlarm>,
+        settingsStore: SettingsStore
+    ) {
+        val updated = alarms.map { existing ->
+            if (existing.id == alarmId) existing.copy(enabled = false) else existing
+        }
+        settingsStore.saveAlarms(updated)
+        Log.i("SunEventReceiver", "Disabled one-shot alarm $alarmId after firing.")
     }
 
     private fun resolveCoordinate(settings: UserSettings, sourceIntent: Intent): Coordinate? {

@@ -165,6 +165,39 @@ class SunScheduleServiceTest {
         )
     }
 
+    @Test
+    fun unschedulesWhenAlarmIsDisabled() = runTest {
+        val calculator = SunTimesCalculator()
+        val notificationScheduler = RecordingNotificationScheduler()
+        val repo = object : SettingsRepository {
+            override suspend fun load(): UserSettings = TODO("Not used")
+            override suspend fun save(settings: UserSettings) = Unit
+            override suspend fun loadAlarms(): List<SunAlarm> = alarms
+            override suspend fun saveAlarms(alarms: List<SunAlarm>) = Unit
+
+            var alarms: List<SunAlarm> = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "One-shot",
+                    enabled = true,
+                    recurrenceDays = null
+                )
+            )
+        }
+        val service = SunScheduleService(calculator, repo, notificationScheduler)
+        val coordinate = Coordinate(0.0, 0.0)
+        val zone = ZoneId.of("UTC")
+
+        service.schedule(coordinate, zone)
+        assertTrue(notificationScheduler.entries.isNotEmpty())
+
+        repo.alarms = repo.alarms.map { it.copy(enabled = false) }
+        service.schedule(coordinate, zone)
+
+        assertTrue(notificationScheduler.entries.isEmpty())
+    }
+
     private class RecordingNotificationScheduler : AlarmScheduler {
         data class Entry(
             val alarmId: String,
