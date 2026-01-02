@@ -73,21 +73,10 @@ class HomeViewModel(
         viewModelScope.launch { loadState() }
     }
 
-    fun addAlarm(
-        type: SunEventType,
-        offsetMinutes: Int,
-        label: String,
-        enabled: Boolean
-    ) {
+    fun addAlarm(alarm: SunAlarm) {
         viewModelScope.launch {
             val current = _state.value
-            val newAlarm = SunAlarm(
-                id = UUID.randomUUID().toString(),
-                type = type,
-                offsetMinutes = offsetMinutes,
-                label = label,
-                enabled = enabled
-            )
+            val newAlarm = alarm.copy(id = alarm.id.ifBlank { UUID.randomUUID().toString() })
             persistAlarms(current.allAlarms() + newAlarm)
         }
     }

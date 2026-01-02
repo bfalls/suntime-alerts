@@ -1,11 +1,18 @@
 package com.bfalls.suntimealerts.alarm.presentation.ui
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import android.graphics.Paint
 import android.graphics.drawable.ColorDrawable
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.widget.EditText
 import android.widget.NumberPicker
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -31,6 +38,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,6 +83,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
@@ -92,7 +101,10 @@ import com.bfalls.suntimealerts.R
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
+import com.bfalls.suntimealerts.alarm.domain.model.includesDay
+import com.bfalls.suntimealerts.alarm.domain.model.toBitMask
 import com.bfalls.suntimealerts.alarm.domain.service.MoonArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.MoonXY
 import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
@@ -103,6 +115,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
+import java.time.DayOfWeek
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -145,7 +158,7 @@ fun HomeScreen(viewModel: HomeViewModel) {
 @Composable
 fun HomeScreenContent(
     state: HomeViewModel.State,
-    onAddAlarm: (SunEventType, Int, String, Boolean) -> Unit,
+    onAddAlarm: (SunAlarm) -> Unit,
     onUpdateAlarm: (SunAlarm) -> Unit,
     onToggleAlarmEnabled: (String, Boolean) -> Unit,
     onDeleteAlarm: (String) -> Unit,
@@ -294,7 +307,7 @@ fun HomeScreenContent(
             onDismiss = { showSheet = false },
             onSave = { alarm ->
                 if (editingAlarm == null) {
-                    onAddAlarm(alarm.type, alarm.offsetMinutes, alarm.label, alarm.enabled)
+                    onAddAlarm(alarm)
                 } else {
                     onUpdateAlarm(alarm)
                 }
@@ -391,6 +404,26 @@ private fun AlarmEditorSheet(
     var minutes by rememberSaveable { mutableStateOf(abs(initialAlarm?.offsetMinutes ?: 0) % 60) }
     var label by rememberSaveable { mutableStateOf(initialAlarm?.label ?: "") }
     var enabled by rememberSaveable { mutableStateOf(initialAlarm?.enabled ?: true) }
+    var recurrenceMask by rememberSaveable { mutableStateOf(initialAlarm?.recurrenceDays ?: ALL_DAYS_MASK) }
+    var soundUriValue by rememberSaveable { mutableStateOf(initialAlarm?.soundUri) }
+    var vibrate by rememberSaveable { mutableStateOf(initialAlarm?.vibrate ?: true) }
+    val context = LocalContext.current
+    val ringtoneLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+        }
+        soundUriValue = when {
+            uri == null -> ""
+            uri == Settings.System.DEFAULT_ALARM_ALERT_URI -> null
+            else -> uri.toString()
+        }
+    }
 
     LaunchedEffect(initialAlarm?.id, defaultType) {
         type = initialAlarm?.type ?: defaultType
@@ -400,6 +433,9 @@ private fun AlarmEditorSheet(
         minutes = abs(offset) % 60
         label = initialAlarm?.label ?: ""
         enabled = initialAlarm?.enabled ?: true
+        recurrenceMask = initialAlarm?.recurrenceDays ?: ALL_DAYS_MASK
+        soundUriValue = initialAlarm?.soundUri
+        vibrate = initialAlarm?.vibrate ?: true
     }
 
     ModalBottomSheet(
@@ -472,6 +508,77 @@ private fun AlarmEditorSheet(
                     unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                 )
             )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(text = "Repeat")
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                        DayOfWeek.SUNDAY,
+                        DayOfWeek.MONDAY,
+                        DayOfWeek.TUESDAY,
+                        DayOfWeek.WEDNESDAY,
+                        DayOfWeek.THURSDAY,
+                        DayOfWeek.FRIDAY,
+                        DayOfWeek.SATURDAY
+                    ).forEach { day ->
+                        val initial = day.name.first().toString()
+                        val selected = recurrenceMask.includesDay(day)
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                val bit = setOf(day).toBitMask()
+                                recurrenceMask = if (selected) {
+                                    recurrenceMask and bit.inv()
+                                } else {
+                                    recurrenceMask or bit
+                                }
+                            },
+                            label = { Text(initial) }
+                        )
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val currentSound = soundUriValue
+                        val existingUri = when {
+                            currentSound == null -> Settings.System.DEFAULT_ALARM_ALERT_URI
+                            currentSound.isBlank() -> null
+                            else -> runCatching { Uri.parse(currentSound) }.getOrNull()
+                        }
+                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, Settings.System.DEFAULT_ALARM_ALERT_URI)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existingUri)
+                        }
+                        ringtoneLauncher.launch(intent)
+                },
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(text = "Sound")
+                val currentSound = soundUriValue
+                val soundLabel = when {
+                    currentSound == null -> "Default"
+                    currentSound.isBlank() -> "Silent"
+                    else -> {
+                        val uri = runCatching { Uri.parse(currentSound) }.getOrNull()
+                        val title = uri?.let { RingtoneManager.getRingtone(context, it)?.getTitle(context) }
+                        title ?: "Custom"
+                    }
+                }
+                Text(text = soundLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Vibrate")
+                Switch(checked = vibrate, onCheckedChange = { vibrate = it })
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -498,12 +605,18 @@ private fun AlarmEditorSheet(
                             type = type,
                             offsetMinutes = offset,
                             label = label,
-                            enabled = enabled
+                            enabled = enabled,
+                            recurrenceDays = recurrenceMask,
+                            soundUri = soundUriValue,
+                            vibrate = vibrate
                         ) ?: SunAlarm(
                             type = type,
                             offsetMinutes = offset,
                             label = label,
-                            enabled = enabled
+                            enabled = enabled,
+                            recurrenceDays = recurrenceMask,
+                            soundUri = soundUriValue,
+                            vibrate = vibrate
                         )
                         onSave(updated)
                     },

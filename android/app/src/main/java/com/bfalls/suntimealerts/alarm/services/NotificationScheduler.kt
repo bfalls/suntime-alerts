@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
@@ -19,13 +20,23 @@ import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.bfalls.suntimealerts.alarm.data.SettingsStore
+import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
+import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
+import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
+import com.bfalls.suntimealerts.alarm.domain.service.AlarmOccurrenceCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
 import kotlin.math.abs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 interface AlarmScheduler {
     fun schedule(
@@ -35,7 +46,10 @@ interface AlarmScheduler {
         zoneId: ZoneId,
         label: String,
         offsetMinutes: Int,
-        date: LocalDate
+        date: LocalDate,
+        soundUri: String?,
+        vibrate: Boolean,
+        coordinate: Coordinate
     )
 
     fun cancelAll()
@@ -53,7 +67,10 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
         zoneId: ZoneId,
         label: String,
         offsetMinutes: Int,
-        date: LocalDate
+        date: LocalDate,
+        soundUri: String?,
+        vibrate: Boolean,
+        coordinate: Coordinate
     ) {
         val intent = Intent(context, SunEventReceiver::class.java).apply {
             putExtra("type", eventType.name)
@@ -61,8 +78,11 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
             putExtra("label", label)
             putExtra("offsetMinutes", offsetMinutes)
             putExtra("zoneId", zoneId.id)
+            putExtra("soundUri", soundUri)
+            putExtra("vibrate", vibrate)
+            putExtra("latitude", coordinate.latitude)
+            putExtra("longitude", coordinate.longitude)
         }
-        SunEventReceiver.ensureChannelExists(context)
         val requestCode = requestCode(alarmId, date)
         val pending = PendingIntent.getBroadcast(
             context,
@@ -135,30 +155,53 @@ class SunEventReceiver : BroadcastReceiver() {
         const val channelId = "sun_event_channel"
         const val actionDismiss = "com.bfalls.suntimealerts.ACTION_DISMISS_ALARM"
 
-        fun ensureChannelExists(context: Context): NotificationChannel? {
+        fun channelIdForAlarm(alarmId: String): String = "${channelId}_$alarmId"
+
+        fun ensureChannelExists(
+            context: Context,
+            alarmId: String,
+            soundUri: String?,
+            vibrate: Boolean
+        ): NotificationChannel? {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val existing = manager.getNotificationChannel(channelId)
-            if (existing != null) return existing
-
-            val alarmSound = Settings.System.DEFAULT_ALARM_ALERT_URI
+            val id = channelIdForAlarm(alarmId)
+            val desiredSoundUri = parseSoundUri(soundUri)
+            val existing = manager.getNotificationChannel(id)
             val audioAttrs = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
 
+            if (existing != null) {
+                val existingSound = existing.sound
+                val soundMatches = existingSound == desiredSoundUri
+                val vibrationMatches = existing.shouldVibrate() == vibrate
+                if (soundMatches && vibrationMatches) return existing
+                manager.deleteNotificationChannel(id)
+            }
+
             val channel = NotificationChannel(
-                channelId,
+                id,
                 "Suntime Alerts",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Notifications for sunrise and sunset alerts"
-                enableVibration(true)
+                enableVibration(vibrate)
+                if (vibrate) {
+                    vibrationPattern = longArrayOf(0, 500, 500, 500)
+                }
                 enableLights(true)
-                setSound(alarmSound, audioAttrs)
+                setSound(desiredSoundUri, audioAttrs)
             }
             manager.createNotificationChannel(channel)
             return channel
+        }
+
+        private fun parseSoundUri(soundUri: String?): Uri? = when {
+            soundUri == null -> Settings.System.DEFAULT_ALARM_ALERT_URI
+            soundUri.isBlank() -> null
+            else -> runCatching { Uri.parse(soundUri) }.getOrNull()
         }
     }
 
@@ -175,6 +218,8 @@ class SunEventReceiver : BroadcastReceiver() {
         val offsetMinutes = intent.getIntExtra("offsetMinutes", 0)
         val label = intent.getStringExtra("label").orEmpty()
         val alarmId = intent.getStringExtra("alarmId") ?: UUID.randomUUID().toString()
+        val soundUriString = intent.getStringExtra("soundUri")
+        val vibrate = intent.getBooleanExtra("vibrate", true)
 
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -189,9 +234,14 @@ class SunEventReceiver : BroadcastReceiver() {
 
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = ensureChannelExists(context)
+        val channel = ensureChannelExists(context, alarmId, soundUriString, vibrate)
+        val notificationChannelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            channel?.id ?: channelIdForAlarm(alarmId)
+        } else {
+            channelId
+        }
         val channelImportance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            (channel ?: notificationManager.getNotificationChannel(channelId))?.importance
+            (channel ?: notificationManager.getNotificationChannel(notificationChannelId))?.importance
                 ?: NotificationManager.IMPORTANCE_DEFAULT
         } else {
             NotificationManager.IMPORTANCE_DEFAULT
@@ -216,6 +266,8 @@ class SunEventReceiver : BroadcastReceiver() {
         val title = if (eventType == SunEventType.SUNRISE) "Sunrise alarm" else "Sunset alarm"
         val anchor = if (eventType == SunEventType.SUNRISE) "sunrise" else "sunset"
         val offsetText = formatOffset(offsetMinutes)
+        val parsedSoundUri = parseSoundUri(soundUriString)
+        val vibrationPattern = if (vibrate) longArrayOf(0, 500, 500, 500) else longArrayOf(0L)
         val body = buildString {
             if (label.isNotBlank()) {
                 append(label).append(" • ")
@@ -244,7 +296,7 @@ class SunEventReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, channelId)
+        val notification = NotificationCompat.Builder(context, notificationChannelId)
             .setSmallIcon(R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(body)
@@ -254,11 +306,37 @@ class SunEventReceiver : BroadcastReceiver() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(contentIntent)
             .setDeleteIntent(contentIntent)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .apply {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                    if (parsedSoundUri != null) {
+                        setSound(parsedSoundUri)
+                    }
+                    setVibrate(vibrationPattern)
+                }
+            }
             .setAutoCancel(true)
             .build()
 
         NotificationManagerCompat.from(context).notify(alarmId.hashCode(), notification)
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                val zoneId = intent.getStringExtra("zoneId")?.let { raw ->
+                    runCatching { ZoneId.of(raw) }.getOrDefault(ZoneId.systemDefault())
+                } ?: ZoneId.systemDefault()
+                rescheduleNextOccurrence(
+                    appContext = context.applicationContext,
+                    alarmId = alarmId,
+                    zoneId = zoneId,
+                    sourceIntent = intent
+                )
+            } catch (t: Throwable) {
+                Log.e("SunEventReceiver", "Failed to reschedule next occurrence for alarm $alarmId", t)
+            } finally {
+                pendingResult.finish()
+            }
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val appOps = context.getSystemService(AppOpsManager::class.java)
@@ -283,6 +361,75 @@ class SunEventReceiver : BroadcastReceiver() {
                     "Full-screen intent not allowed by user/system (mode=$mode). " +
                             "Guide the user to allow full-screen notifications in system settings."
                 )
+            }
+        }
+    }
+
+    private suspend fun rescheduleNextOccurrence(
+        appContext: Context,
+        alarmId: String,
+        zoneId: ZoneId,
+        sourceIntent: Intent
+    ) {
+        val settingsStore = SettingsStore(appContext)
+        val settings = settingsStore.load()
+        val alarm = settings.alarms.firstOrNull { it.id == alarmId }
+        if (alarm == null) {
+            Log.i("SunEventReceiver", "Alarm $alarmId is missing; skipping reschedule.")
+            return
+        }
+        if (!alarm.enabled) {
+            Log.i("SunEventReceiver", "Alarm $alarmId is disabled; skipping reschedule.")
+            return
+        }
+        if (!alarm.isRecurring()) {
+            disableOneShotAlarm(alarmId, settings.alarms, settingsStore)
+            return
+        }
+        val coordinate = resolveCoordinate(settings, sourceIntent)
+        if (coordinate == null) {
+            Log.w("SunEventReceiver", "No coordinate available to reschedule alarm $alarmId; skipping.")
+            return
+        }
+
+        val occurrenceCalculator = AlarmOccurrenceCalculator(SunTimesCalculator())
+        val nextOccurrence = occurrenceCalculator.nextOccurrence(alarm, coordinate, zoneId) ?: return
+
+        NotificationScheduler(appContext).schedule(
+            alarmId = alarm.id,
+            eventType = alarm.type,
+            triggerAtMillis = nextOccurrence.triggerAtMillis,
+            zoneId = zoneId,
+            label = alarm.label,
+            offsetMinutes = alarm.offsetMinutes,
+            date = nextOccurrence.date,
+            soundUri = alarm.soundUri,
+            vibrate = alarm.vibrate ?: true,
+            coordinate = coordinate
+        )
+    }
+
+    private fun SunAlarm.isRecurring(): Boolean = recurrenceDays != null && recurrenceDays != 0
+
+    private suspend fun disableOneShotAlarm(
+        alarmId: String,
+        alarms: List<SunAlarm>,
+        settingsStore: SettingsStore
+    ) {
+        val updated = alarms.map { existing ->
+            if (existing.id == alarmId) existing.copy(enabled = false) else existing
+        }
+        settingsStore.saveAlarms(updated)
+        Log.i("SunEventReceiver", "Disabled one-shot alarm $alarmId after firing.")
+    }
+
+    private fun resolveCoordinate(settings: UserSettings, sourceIntent: Intent): Coordinate? {
+        return when (settings.locationMode) {
+            LocationMode.FIXED -> settings.fixedLocation
+            LocationMode.DEVICE -> {
+                val lat = sourceIntent.getDoubleExtra("latitude", Double.NaN)
+                val lon = sourceIntent.getDoubleExtra("longitude", Double.NaN)
+                if (lat.isFinite() && lon.isFinite()) Coordinate(lat, lon) else null
             }
         }
     }
