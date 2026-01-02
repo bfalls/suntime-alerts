@@ -18,6 +18,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +29,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 //import androidx.compose.foundation.lazy.stickyHeader
@@ -398,6 +402,7 @@ private fun AlarmEditorSheet(
     onSave: (SunAlarm) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scrollState = rememberScrollState()
     var type by rememberSaveable { mutableStateOf(initialAlarm?.type ?: defaultType) }
     var isAfter by rememberSaveable { mutableStateOf((initialAlarm?.offsetMinutes ?: 0) >= 0) }
     var hours by rememberSaveable { mutableStateOf(abs(initialAlarm?.offsetMinutes ?: 0) / 60) }
@@ -447,42 +452,61 @@ private fun AlarmEditorSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .verticalScroll(scrollState)
+                .padding(16.dp)
+                .navigationBarsPadding()
+                .imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(text = if (initialAlarm == null) "Add alarm" else "Edit alarm", fontWeight = FontWeight.Bold)
-            Text(text = "Event")
-            SingleChoiceSegmentedButtonRow {
-                SegmentedButton(
-                    selected = type == SunEventType.SUNRISE,
-                    onClick = { type = SunEventType.SUNRISE },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(text = "Event")
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text("Sunrise")
-                }
-                SegmentedButton(
-                    selected = type == SunEventType.SUNSET,
-                    onClick = { type = SunEventType.SUNSET },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) {
-                    Text("Sunset")
+                    SegmentedButton(
+                        selected = type == SunEventType.SUNRISE,
+                        onClick = { type = SunEventType.SUNRISE },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text("Sunrise")
+                    }
+                    SegmentedButton(
+                        selected = type == SunEventType.SUNSET,
+                        onClick = { type = SunEventType.SUNSET },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text("Sunset")
+                    }
                 }
             }
-            Text(text = "Timing")
-            SingleChoiceSegmentedButtonRow {
-                SegmentedButton(
-                    selected = !isAfter,
-                    onClick = { isAfter = false },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(text = "Timing")
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text("Before")
-                }
-                SegmentedButton(
-                    selected = isAfter,
-                    onClick = { isAfter = true },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) {
-                    Text("After")
+                    SegmentedButton(
+                        selected = !isAfter,
+                        onClick = { isAfter = false },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text("Before")
+                    }
+                    SegmentedButton(
+                        selected = isAfter,
+                        onClick = { isAfter = true },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text("After")
+                    }
                 }
             }
             OffsetPicker(
