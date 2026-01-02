@@ -8,12 +8,14 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.domain.model.withDefaults
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import androidx.datastore.preferences.core.Preferences
@@ -118,7 +120,9 @@ class SettingsStore(private val context: Context) : SettingsRepository {
         if (json.isBlank()) return emptyList()
         val type = object : TypeToken<List<SunAlarm>>() {}.type
         return try {
-            gson.fromJson<List<SunAlarm>>(json, type) ?: emptyList()
+            (gson.fromJson<List<SunAlarm>>(json, type) ?: emptyList()).map { alarm ->
+                alarm.withDefaults()
+            }
         } catch (t: Throwable) {
             Log.w("SettingsStore", "Failed to parse alarmsJson; falling back to defaults.", t)
             emptyList()
@@ -144,13 +148,17 @@ internal fun migrateLegacyAlarms(
         type = SunEventType.SUNRISE,
         offsetMinutes = sunriseOffset,
         label = "Sunrise",
-        enabled = sunriseEnabled
+        enabled = sunriseEnabled,
+        recurrenceDays = ALL_DAYS_MASK,
+        vibrate = true
     ),
     SunAlarm(
         id = UUID.randomUUID().toString(),
         type = SunEventType.SUNSET,
         offsetMinutes = sunsetOffset,
         label = "Sunset",
-        enabled = sunsetEnabled
+        enabled = sunsetEnabled,
+        recurrenceDays = ALL_DAYS_MASK,
+        vibrate = true
     )
 )

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.bfalls.suntimealerts.alarm.data.LocationProvider
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
+import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
@@ -226,7 +227,9 @@ class OnboardingViewModel(
                     type = SunEventType.SUNRISE,
                     offsetMinutes = onboardingState.sunriseOffsetMinutes,
                     label = existingAlarmsByType[SunEventType.SUNRISE]?.label ?: "Sunrise",
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled,
+                    recurrenceDays = ALL_DAYS_MASK,
+                    vibrate = true
                 ),
                 SunAlarm(
                     id = existingAlarmsByType[SunEventType.SUNSET]?.id ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNSET }?.id
@@ -234,7 +237,9 @@ class OnboardingViewModel(
                     type = SunEventType.SUNSET,
                     offsetMinutes = onboardingState.sunsetOffsetMinutes,
                     label = existingAlarmsByType[SunEventType.SUNSET]?.label ?: "Sunset",
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled
+                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled,
+                    recurrenceDays = ALL_DAYS_MASK,
+                    vibrate = true
                 )
             )
             settings = settings.copy(

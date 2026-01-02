@@ -6,12 +6,17 @@ import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.domain.model.toBitMask
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.services.AlarmScheduler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Clock
+import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -63,6 +68,93 @@ class SunScheduleServiceTest {
         )
     }
 
+    @Test
+    fun doesNotSchedulePastOccurrences() = runTest {
+        val calculator = SunTimesCalculator()
+        val fixedInstant = Instant.parse("2024-01-01T12:00:00Z")
+        val zone = ZoneId.of("UTC")
+        val clock = Clock.fixed(fixedInstant, zone)
+        val notificationScheduler = RecordingNotificationScheduler()
+        val repo = object : SettingsRepository {
+            override suspend fun load(): UserSettings = TODO("Not used")
+            override suspend fun save(settings: UserSettings) = Unit
+            override suspend fun loadAlarms(): List<SunAlarm> = alarms
+            override suspend fun saveAlarms(alarms: List<SunAlarm>) = Unit
+
+            private val alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Morning walk",
+                    enabled = true
+                )
+            )
+        }
+        val service = SunScheduleService(calculator, repo, notificationScheduler, clock)
+        val coordinate = Coordinate(0.0, 0.0)
+
+        service.schedule(coordinate, zone)
+
+        val today = LocalDate.now(clock)
+        val tomorrow = today.plusDays(1)
+        val sunTimesTomorrow = calculator.calculateSunTimes(tomorrow, coordinate, zone)
+        val expectedTomorrowTrigger = requireNotNull(sunTimesTomorrow.sunrise).toInstant().toEpochMilli()
+        assertFalse(
+            "Should not schedule past occurrences for today",
+            notificationScheduler.entries.any { entry ->
+                Instant.ofEpochMilli(entry.triggerAtMillis).atZone(zone).toLocalDate() == today
+            }
+        )
+        assertTrue(
+            "Should schedule tomorrow's occurrence",
+            notificationScheduler.entries.any { entry -> entry.triggerAtMillis == expectedTomorrowTrigger }
+        )
+    }
+
+    @Test
+    fun skipsUnselectedRecurrenceDays() = runTest {
+        val calculator = SunTimesCalculator()
+        val fixedInstant = Instant.parse("2024-01-02T10:00:00Z") // Tuesday
+        val zone = ZoneId.of("UTC")
+        val clock = Clock.fixed(fixedInstant, zone)
+        val notificationScheduler = RecordingNotificationScheduler()
+        val repo = object : SettingsRepository {
+            override suspend fun load(): UserSettings = TODO("Not used")
+            override suspend fun save(settings: UserSettings) = Unit
+            override suspend fun loadAlarms(): List<SunAlarm> = alarms
+            override suspend fun saveAlarms(alarms: List<SunAlarm>) = Unit
+
+            private val alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Weekday alarm",
+                    enabled = true,
+                    recurrenceDays = setOf(DayOfWeek.WEDNESDAY).toBitMask()
+                )
+            )
+        }
+        val service = SunScheduleService(calculator, repo, notificationScheduler, clock)
+        val coordinate = Coordinate(0.0, 0.0)
+
+        service.schedule(coordinate, zone)
+
+        val today = LocalDate.now(clock)
+        val tomorrow = today.plusDays(1)
+        assertFalse(
+            "Should not schedule on an unselected day (today)",
+            notificationScheduler.entries.any { entry ->
+                Instant.ofEpochMilli(entry.triggerAtMillis).atZone(zone).toLocalDate() == today
+            }
+        )
+        assertTrue(
+            "Should schedule on the next selected day (tomorrow, Wednesday)",
+            notificationScheduler.entries.any { entry ->
+                Instant.ofEpochMilli(entry.triggerAtMillis).atZone(zone).toLocalDate() == tomorrow
+            }
+        )
+    }
+
     private class RecordingNotificationScheduler : AlarmScheduler {
         data class Entry(
             val alarmId: String,
@@ -72,7 +164,17 @@ class SunScheduleServiceTest {
 
         val entries = mutableListOf<Entry>()
 
-        override fun schedule(alarmId: String, eventType: SunEventType, triggerAtMillis: Long, zoneId: ZoneId, label: String, offsetMinutes: Int, date: LocalDate) {
+        override fun schedule(
+            alarmId: String,
+            eventType: SunEventType,
+            triggerAtMillis: Long,
+            zoneId: ZoneId,
+            label: String,
+            offsetMinutes: Int,
+            date: LocalDate,
+            soundUri: String?,
+            vibrate: Boolean
+        ) {
             entries += Entry(alarmId, eventType, triggerAtMillis)
         }
 
