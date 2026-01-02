@@ -99,7 +99,6 @@ import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -363,34 +362,31 @@ private fun AlarmRow(
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onEdit() }
-            .padding(vertical = 8.dp)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.align(Alignment.CenterStart)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = formatOffset(alarm.offsetMinutes),
                 fontWeight = FontWeight.Bold
             )
-            if (alarm.label.isNotBlank()) {
-                Text(
-                    text = alarm.label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            val description = appendRecurrenceLabel(
+                label = alarm.label,
+                recurrenceSummary = recurrenceSummary(alarm.recurrenceDays)
+            )
+            if (description.isNotBlank()) {
+                Text(text = description)
             }
         }
-        Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Switch(
-                checked = alarm.enabled,
-                onCheckedChange = onToggle
-            )
-        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Switch(
+            checked = alarm.enabled,
+            onCheckedChange = onToggle
+        )
     }
 }
 
@@ -600,6 +596,7 @@ private fun AlarmEditorSheet(
                 onValueChange = { label = it },
                 label = { Text("Label") },
                 modifier = Modifier.fillMaxWidth(),
+                maxLines = 3,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
