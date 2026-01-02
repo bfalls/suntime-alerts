@@ -64,11 +64,11 @@ class HomeScreenAppBarTest {
             SuntimeAlertsTheme {
                 HomeScreenContent(
                     state = state,
-                    onAddAlarm = { _, _, _, _ -> },
+                    onAddAlarm = { _ -> },
                     onUpdateAlarm = {},
                     onToggleAlarmEnabled = { _, _ -> },
                     onDeleteAlarm = {},
-                    onDuplicateAlarm = {},
+                    onDuplicateAlarm = { _ -> },
                     onRestoreAlarm = {}
                 )
             }
@@ -100,11 +100,11 @@ class HomeScreenAppBarTest {
             SuntimeAlertsTheme {
                 HomeScreenContent(
                     state = state,
-                    onAddAlarm = { _, _, _, _ -> },
+                    onAddAlarm = { _ -> },
                     onUpdateAlarm = {},
                     onToggleAlarmEnabled = { _, _ -> },
                     onDeleteAlarm = {},
-                    onDuplicateAlarm = {},
+                    onDuplicateAlarm = { _ -> },
                     onRestoreAlarm = {}
                 )
             }
@@ -117,7 +117,7 @@ class HomeScreenAppBarTest {
         composeTestRule.onNodeWithText("After").assertExists()
         composeTestRule.onNodeWithText("Hours").assertExists()
         composeTestRule.onNodeWithText("Minutes").assertExists()
-        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.onNodeWithContentDescription("Cancel").performClick()
 
         composeTestRule.onNodeWithText("Label").assertDoesNotExist()
     }
@@ -149,11 +149,11 @@ class HomeScreenAppBarTest {
             SuntimeAlertsTheme {
                 HomeScreenContent(
                     state = state,
-                    onAddAlarm = { _, _, _, _ -> },
+                    onAddAlarm = { _ -> },
                     onUpdateAlarm = {},
                     onToggleAlarmEnabled = { _, _ -> },
                     onDeleteAlarm = {},
-                    onDuplicateAlarm = {},
+                    onDuplicateAlarm = { _ -> },
                     onRestoreAlarm = {}
                 )
             }
