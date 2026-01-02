@@ -33,9 +33,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 //import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -81,6 +83,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -612,7 +615,11 @@ private fun AlarmEditorSheet(
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(text = "Repeat")
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val daySize = 40.dp
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
                     listOf(
                         DayOfWeek.SUNDAY,
                         DayOfWeek.MONDAY,
@@ -624,18 +631,38 @@ private fun AlarmEditorSheet(
                     ).forEach { day ->
                         val initial = day.name.first().toString()
                         val selected = recurrenceMask.includesDay(day)
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                val bit = setOf(day).toBitMask()
-                                recurrenceMask = if (selected) {
-                                    recurrenceMask and bit.inv()
-                                } else {
-                                    recurrenceMask or bit
-                                }
-                            },
-                            label = { Text(initial) }
-                        )
+                        val dayBit = setOf(day).toBitMask()
+                        val backgroundColor = if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+                        }
+                        val contentColor = if (selected) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(daySize)
+                                .clip(CircleShape)
+                                .background(backgroundColor)
+                                .clickable {
+                                    recurrenceMask = if (selected) {
+                                        recurrenceMask and dayBit.inv()
+                                    } else {
+                                        recurrenceMask or dayBit
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = initial,
+                                color = contentColor,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
