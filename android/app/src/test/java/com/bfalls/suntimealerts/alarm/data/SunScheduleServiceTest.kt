@@ -27,6 +27,9 @@ class SunScheduleServiceTest {
     fun schedulesWithOffsetApplied() = runTest {
         val calculator = SunTimesCalculator()
         val notificationScheduler = RecordingNotificationScheduler()
+        val fixedInstant = Instant.parse("2024-01-01T00:00:00Z")
+        val zone = ZoneId.of("UTC")
+        val clock = Clock.fixed(fixedInstant, zone)
         val repo = object : SettingsRepository {
             override suspend fun load(): UserSettings = UserSettings(
                 locationMode = LocationMode.DEVICE,
@@ -50,13 +53,12 @@ class SunScheduleServiceTest {
                 )
             )
         }
-        val service = SunScheduleService(calculator, repo, notificationScheduler)
+        val service = SunScheduleService(calculator, repo, notificationScheduler, clock)
         val coordinate = Coordinate(0.0, 0.0)
-        val zone = ZoneId.of("UTC")
 
         service.schedule(coordinate, zone)
 
-        val today = LocalDate.now(zone)
+        val today = LocalDate.now(clock)
         val sunTimes = calculator.calculateSunTimes(today, coordinate, zone)
         val expectedTrigger = requireNotNull(sunTimes.sunrise).toInstant().toEpochMilli() + 30 * 60 * 1000L
 
