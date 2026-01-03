@@ -30,9 +30,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,7 +41,6 @@ import androidx.compose.foundation.shape.CircleShape
 //import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
@@ -50,10 +49,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -71,6 +70,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -437,7 +437,7 @@ private fun initialAlarmValues(alarm: SunAlarm?, defaultType: SunEventType): Ala
         minutes = abs(offset) % 60,
         label = alarm?.label ?: "",
         enabled = alarm?.enabled ?: true,
-        recurrenceMask = alarm?.recurrenceDays ?: ALL_DAYS_MASK,
+        recurrenceMask = alarm?.recurrenceDays ?: if (alarm == null) 0 else ALL_DAYS_MASK,
         soundUriValue = alarm?.soundUri,
         vibrate = alarm?.vibrate ?: true
     )
@@ -531,236 +531,252 @@ private fun AlarmEditorSheet(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollState)
-                .padding(16.dp)
-                .navigationBarsPadding()
-                .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxSize()
+                .imePadding()
         ) {
-            Text(text = if (initialAlarm == null) "Add alarm" else "Edit alarm", fontWeight = FontWeight.Bold)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(text = "Event")
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    SegmentedButton(
-                        selected = type == SunEventType.SUNRISE,
-                        onClick = { type = SunEventType.SUNRISE },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) {
-                        Text("Sunrise")
-                    }
-                    SegmentedButton(
-                        selected = type == SunEventType.SUNSET,
-                        onClick = { type = SunEventType.SUNSET },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) {
-                        Text("Sunset")
-                    }
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(text = "Timing")
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    SegmentedButton(
-                        selected = !isAfter,
-                        onClick = { isAfter = false },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) {
-                        Text("Before")
-                    }
-                    SegmentedButton(
-                        selected = isAfter,
-                        onClick = { isAfter = true },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) {
-                        Text("After")
-                    }
-                }
-            }
-            OffsetPicker(
-                hours = hours,
-                minutes = minutes,
-                onHoursChanged = { hours = it },
-                onMinutesChanged = { minutes = it }
-            )
-            TextField(
-                value = label,
-                onValueChange = { label = it },
-                label = { Text("Label") },
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 3,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                    unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = "Repeat")
-                val daySize = 40.dp
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    listOf(
-                        DayOfWeek.SUNDAY,
-                        DayOfWeek.MONDAY,
-                        DayOfWeek.TUESDAY,
-                        DayOfWeek.WEDNESDAY,
-                        DayOfWeek.THURSDAY,
-                        DayOfWeek.FRIDAY,
-                        DayOfWeek.SATURDAY
-                    ).forEach { day ->
-                        val initial = day.name.first().toString()
-                        val selected = recurrenceMask.includesDay(day)
-                        val dayBit = setOf(day).toBitMask()
-                        val backgroundColor = if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
-                        }
-                        val contentColor = if (selected) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(daySize)
-                                .clip(CircleShape)
-                                .background(backgroundColor)
-                                .clickable {
-                                    recurrenceMask = if (selected) {
-                                        recurrenceMask and dayBit.inv()
-                                    } else {
-                                        recurrenceMask or dayBit
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = initial,
-                                color = contentColor,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-            }
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        val currentSound = soundUriValue
-                        val existingUri = when {
-                            currentSound == null -> Settings.System.DEFAULT_ALARM_ALERT_URI
-                            currentSound.isBlank() -> null
-                            else -> runCatching { Uri.parse(currentSound) }.getOrNull()
-                        }
-                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, Settings.System.DEFAULT_ALARM_ALERT_URI)
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existingUri)
-                        }
-                        ringtoneLauncher.launch(intent)
-                },
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .weight(1f, fill = true)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(text = "Sound")
-                val currentSound = soundUriValue
-                val soundLabel = when {
-                    currentSound == null -> "Default"
-                    currentSound.isBlank() -> "Silent"
-                    else -> {
-                        val uri = runCatching { Uri.parse(currentSound) }.getOrNull()
-                        val title = uri?.let { RingtoneManager.getRingtone(context, it)?.getTitle(context) }
-                        title ?: "Custom"
-                    }
-                }
-                Text(text = soundLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Vibrate")
-                Switch(checked = vibrate, onCheckedChange = { vibrate = it })
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Enabled")
-                Switch(checked = enabled, onCheckedChange = { enabled = it })
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                Text(text = if (initialAlarm == null) "Add alarm" else "Edit alarm", fontWeight = FontWeight.Bold)
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    IconButton(onClick = handleCancel) {
-                        Icon(Icons.Default.Close, contentDescription = "Cancel")
-                    }
-                    if (initialAlarm != null) {
-                        IconButton(
-                            onClick = {
-                                onDelete(initialAlarm)
-                                onDismiss()
-                            },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
+                    Text(text = "Event")
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        SegmentedButton(
+                            selected = type == SunEventType.SUNRISE,
+                            onClick = { type = SunEventType.SUNRISE },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete alarm")
+                            Text("Sunrise")
                         }
-                        IconButton(
-                            onClick = {
-                                onDuplicate(currentValues.toAlarm(initialAlarm))
-                                onDismiss()
-                            }
+                        SegmentedButton(
+                            selected = type == SunEventType.SUNSET,
+                            onClick = { type = SunEventType.SUNSET },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate alarm")
+                            Text("Sunset")
                         }
                     }
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                Button(
-                    onClick = {
-                        onSave(currentValues.toAlarm(initialAlarm))
-                        onDismiss()
-                    },
-                    enabled = canSave
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Save")
+                    Text(text = "Timing")
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        SegmentedButton(
+                            selected = !isAfter,
+                            onClick = { isAfter = false },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) {
+                            Text("Before")
+                        }
+                        SegmentedButton(
+                            selected = isAfter,
+                            onClick = { isAfter = true },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) {
+                            Text("After")
+                        }
+                    }
+                }
+                OffsetPicker(
+                    hours = hours,
+                    minutes = minutes,
+                    onHoursChanged = { hours = it },
+                    onMinutesChanged = { minutes = it }
+                )
+                TextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text("Label") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f),
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "Repeat")
+                    val daySize = 40.dp
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        listOf(
+                            DayOfWeek.SUNDAY,
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY,
+                            DayOfWeek.SATURDAY
+                        ).forEach { day ->
+                            val initial = day.name.first().toString()
+                            val selected = recurrenceMask.includesDay(day)
+                            val dayBit = setOf(day).toBitMask()
+                            val backgroundColor = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+                            }
+                            val contentColor = if (selected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(daySize)
+                                    .clip(CircleShape)
+                                    .background(backgroundColor)
+                                    .clickable {
+                                        recurrenceMask = if (selected) {
+                                            recurrenceMask and dayBit.inv()
+                                        } else {
+                                            recurrenceMask or dayBit
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = initial,
+                                    color = contentColor,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val currentSound = soundUriValue
+                            val existingUri = when {
+                                currentSound == null -> Settings.System.DEFAULT_ALARM_ALERT_URI
+                                currentSound.isBlank() -> null
+                                else -> runCatching { Uri.parse(currentSound) }.getOrNull()
+                            }
+                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, Settings.System.DEFAULT_ALARM_ALERT_URI)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existingUri)
+                            }
+                            ringtoneLauncher.launch(intent)
+                    },
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(text = "Sound")
+                    val currentSound = soundUriValue
+                    val soundLabel = when {
+                        currentSound == null -> "Default"
+                        currentSound.isBlank() -> "Silent"
+                        else -> {
+                            val uri = runCatching { Uri.parse(currentSound) }.getOrNull()
+                            val title = uri?.let { RingtoneManager.getRingtone(context, it)?.getTitle(context) }
+                            title ?: "Custom"
+                        }
+                    }
+                    Text(text = soundLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Vibrate")
+                    Switch(checked = vibrate, onCheckedChange = { vibrate = it })
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Enabled")
+                    Switch(checked = enabled, onCheckedChange = { enabled = it })
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                tonalElevation = 4.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+            ) {
+                Column {
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            TextButton(onClick = handleCancel) {
+                                Text("Cancel")
+                            }
+                            if (initialAlarm != null) {
+                                IconButton(
+                                    onClick = {
+                                        onDelete(initialAlarm)
+                                        onDismiss()
+                                    },
+                                    colors = IconButtonDefaults.iconButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete alarm")
+                                }
+                                IconButton(
+                                    onClick = {
+                                        onDuplicate(currentValues.toAlarm(initialAlarm))
+                                        onDismiss()
+                                    }
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate alarm")
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = {
+                                onSave(currentValues.toAlarm(initialAlarm))
+                                onDismiss()
+                            },
+                            enabled = canSave
+                        ) {
+                            Text("Save")
+                        }
+                    }
+                }
+            }
         }
     }
 
