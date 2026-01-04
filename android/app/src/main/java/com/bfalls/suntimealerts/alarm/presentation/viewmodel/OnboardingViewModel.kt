@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.bfalls.suntimealerts.alarm.data.LocationProvider
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
+import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNRISE_ALARM_ID
+import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNSET_ALARM_ID
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
@@ -222,8 +224,9 @@ class OnboardingViewModel(
             val onboardingState = _state.value
             val updatedAlarms = listOf(
                 SunAlarm(
-                    id = existingAlarmsByType[SunEventType.SUNRISE]?.id ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNRISE }?.id
-                    ?: java.util.UUID.randomUUID().toString(),
+                    id = existingAlarmsByType[SunEventType.SUNRISE]?.id
+                        ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNRISE }?.id
+                        ?: DEFAULT_SUNRISE_ALARM_ID,
                     type = SunEventType.SUNRISE,
                     offsetMinutes = onboardingState.sunriseOffsetMinutes,
                     label = existingAlarmsByType[SunEventType.SUNRISE]?.label ?: "Sunrise",
@@ -232,8 +235,9 @@ class OnboardingViewModel(
                     vibrate = true
                 ),
                 SunAlarm(
-                    id = existingAlarmsByType[SunEventType.SUNSET]?.id ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNSET }?.id
-                    ?: java.util.UUID.randomUUID().toString(),
+                    id = existingAlarmsByType[SunEventType.SUNSET]?.id
+                        ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNSET }?.id
+                        ?: DEFAULT_SUNSET_ALARM_ID,
                     type = SunEventType.SUNSET,
                     offsetMinutes = onboardingState.sunsetOffsetMinutes,
                     label = existingAlarmsByType[SunEventType.SUNSET]?.label ?: "Sunset",

@@ -8,6 +8,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -29,6 +30,8 @@ import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.service.AlarmOccurrenceCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
+import com.bfalls.suntimealerts.alarm.services.SunEventIntentFactory
+import com.bfalls.suntimealerts.alarm.services.SunEventIntentFactory.ACTION_SUN_EVENT_ALARM
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -52,13 +55,21 @@ interface AlarmScheduler {
         coordinate: Coordinate
     )
 
-    fun cancelAll()
+    fun hasScheduledOccurrence(
+        alarmId: String,
+        eventType: SunEventType,
+        date: LocalDate
+    ): Boolean
+
+    fun cancelOccurrence(
+        alarmId: String,
+        eventType: SunEventType,
+        date: LocalDate
+    )
 }
 
 class NotificationScheduler(private val context: Context) : AlarmScheduler {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    private val prefs = context.getSharedPreferences("sun_alarm_requests", Context.MODE_PRIVATE)
-    private val requestCodesKey = "request_codes"
 
     override fun schedule(
         alarmId: String,
@@ -72,29 +83,27 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
         vibrate: Boolean,
         coordinate: Coordinate
     ) {
-        val intent = Intent(context, SunEventReceiver::class.java).apply {
-            putExtra("type", eventType.name)
-            putExtra("alarmId", alarmId)
-            putExtra("label", label)
-            putExtra("offsetMinutes", offsetMinutes)
-            putExtra("zoneId", zoneId.id)
-            putExtra("soundUri", soundUri)
-            putExtra("vibrate", vibrate)
-            putExtra("latitude", coordinate.latitude)
-            putExtra("longitude", coordinate.longitude)
-        }
-        val requestCode = requestCode(alarmId, date)
+        val identity = SunEventIntentFactory.computeIdentity(alarmId, date, eventType)
+        val intent = SunEventIntentFactory.buildAlarmIntent(
+            alarmId = alarmId,
+            eventType = eventType,
+            label = label,
+            offsetMinutes = offsetMinutes,
+            date = date,
+            zoneId = zoneId,
+            soundUri = soundUri,
+            vibrate = vibrate,
+            coordinate = coordinate
+        )
         val pending = PendingIntent.getBroadcast(
             context,
-            requestCode,
+            identity.requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val scheduledTime = Instant.ofEpochMilli(triggerAtMillis).atZone(zoneId)
         Log.i(
             "NotificationScheduler",
-            "Scheduling ${eventType.name.lowercase()} alarm (id=$alarmId, label=$label, offset=${formatOffset(offsetMinutes)}) " +
-                "for ${scheduledTime.toLocalDate()} ${scheduledTime.toLocalTime()} ${scheduledTime.zone}"
+            "Scheduling ${formatOffset(offsetMinutes)} ${eventType.name.lowercase()} (${SunEventIntentFactory.describe(identity, triggerAtMillis, zoneId)})"
         )
         val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             alarmManager.canScheduleExactAlarms()
@@ -111,42 +120,96 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
             )
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pending)
         }
-        rememberRequestCode(requestCode)
     }
 
-    override fun cancelAll() {
-        val codes = loadRequestCodes()
-        codes.forEach { cancel(it) }
-        prefs.edit().remove(requestCodesKey).apply()
+    override fun cancelOccurrence(
+        alarmId: String,
+        eventType: SunEventType,
+        date: LocalDate
+    ) {
+        cancelForOccurrence(alarmId, eventType, date)
     }
 
-    private fun cancel(requestCode: Int) {
-        val intent = Intent(context, SunEventReceiver::class.java).apply {
-            action = "CANCEL"
-        }
+    override fun hasScheduledOccurrence(
+        alarmId: String,
+        eventType: SunEventType,
+        date: LocalDate
+    ): Boolean {
+        val identity = SunEventIntentFactory.computeIdentity(alarmId, date, eventType)
+        val intent = SunEventIntentFactory.buildIdentityIntent(
+            alarmId = alarmId,
+            eventType = eventType,
+            date = date,
+            attachComponent = true
+        )
         val pending = PendingIntent.getBroadcast(
             context,
-            requestCode,
+            identity.requestCode,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (pending != null) return true
+
+        val legacyRequestCode = abs((alarmId + date.toString()).hashCode())
+        val legacyPending = PendingIntent.getBroadcast(
+            context,
+            legacyRequestCode,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        return legacyPending != null
+    }
+
+    private fun cancelForOccurrence(
+        alarmId: String,
+        eventType: SunEventType,
+        date: LocalDate
+    ) {
+        val identity = SunEventIntentFactory.computeIdentity(alarmId, date, eventType)
+        val intent = SunEventIntentFactory.buildIdentityIntent(
+            alarmId = alarmId,
+            eventType = eventType,
+            date = date,
+            attachComponent = true
+        )
+        val pending = PendingIntent.getBroadcast(
+            context,
+            identity.requestCode,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        ) ?: PendingIntent.getBroadcast(
+            context,
+            identity.requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val legacyRequestCode = abs((alarmId + date.toString()).hashCode())
+        val legacyPending = PendingIntent.getBroadcast(
+            context,
+            legacyRequestCode,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        ) ?: PendingIntent.getBroadcast(
+            context,
+            legacyRequestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.cancel(pending)
-    }
-
-    private fun rememberRequestCode(code: Int) {
-        val updated = loadRequestCodes().apply { add(code) }.map { it.toString() }.toSet()
-        prefs.edit().putStringSet(requestCodesKey, updated).apply()
-    }
-
-    private fun loadRequestCodes(): MutableSet<Int> {
-        return prefs.getStringSet(requestCodesKey, emptySet())
-            ?.mapNotNull { it.toIntOrNull() }
-            ?.toMutableSet()
-            ?: mutableSetOf()
-    }
-
-    private fun requestCode(alarmId: String, date: LocalDate): Int {
-        return abs((alarmId + date.toString()).hashCode())
+        alarmManager.cancel(legacyPending)
+        pending.cancel()
+        legacyPending.cancel()
+        val verification = PendingIntent.getBroadcast(
+            context,
+            identity.requestCode,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        Log.i(
+            "NotificationScheduler",
+            "Canceled alarm id=${identity.alarmId}, event=${identity.eventType.name.lowercase()}, " +
+                "date=${identity.date}, requestCode=${identity.requestCode}, remainingPendingIntent=${verification != null}"
+        )
     }
 }
 
@@ -210,6 +273,10 @@ class SunEventReceiver : BroadcastReceiver() {
         if (intent.action == actionDismiss) {
             val alarmId = intent.getStringExtra("alarmId") ?: return
             NotificationManagerCompat.from(context).cancel(alarmId.hashCode())
+            return
+        }
+        if (intent.action != ACTION_SUN_EVENT_ALARM) {
+            Log.w("SunEventReceiver", "Ignoring intent with unexpected action: ${intent.action}")
             return
         }
 
