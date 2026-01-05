@@ -55,6 +55,12 @@ fun OnboardingScreen(
     onOpenPermissionSettings: () -> Unit,
     onCityQueryChanged: (String) -> Unit,
     onCitySelected: (City) -> Unit,
+    notificationsPermissionRequired: Boolean,
+    exactAlarmPermissionRequired: Boolean,
+    onNotificationsContinue: () -> Unit,
+    onNotificationsSkip: () -> Unit,
+    onExactAlarmsContinue: () -> Unit,
+    onExactAlarmsSkip: () -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit,
     onComplete: () -> Unit,
@@ -79,11 +85,33 @@ fun OnboardingScreen(
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
                         }
-                        Button(
-                            onClick = { if (state.step == OnboardingStep.SUMMARY) onComplete() else onNext() },
-                            enabled = canAdvance
-                        ) {
-                            Text(if (state.step == OnboardingStep.SUMMARY) "Save & Start" else "Next")
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            when (state.step) {
+                                OnboardingStep.NOTIFICATIONS -> {
+                                    OutlinedButton(onClick = onNotificationsSkip) {
+                                        Text("Skip")
+                                    }
+                                    Button(onClick = onNotificationsContinue) {
+                                        Text("Continue")
+                                    }
+                                }
+                                OnboardingStep.EXACT_ALARMS -> {
+                                    OutlinedButton(onClick = onExactAlarmsSkip) {
+                                        Text("Skip")
+                                    }
+                                    Button(onClick = onExactAlarmsContinue) {
+                                        Text("Continue")
+                                    }
+                                }
+                                else -> {
+                                    Button(
+                                        onClick = { if (state.step == OnboardingStep.SUMMARY) onComplete() else onNext() },
+                                        enabled = canAdvance
+                                    ) {
+                                        Text(if (state.step == OnboardingStep.SUMMARY) "Save & Start" else "Next")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -101,6 +129,8 @@ fun OnboardingScreen(
                     text = when (state.step) {
                         OnboardingStep.WELCOME -> "Welcome"
                         OnboardingStep.LOCATION -> "Choose location"
+                        OnboardingStep.NOTIFICATIONS -> "Notifications"
+                        OnboardingStep.EXACT_ALARMS -> "Alarms & reminders"
                         OnboardingStep.SUMMARY -> "Summary"
                     },
                     fontWeight = FontWeight.SemiBold
@@ -114,6 +144,12 @@ fun OnboardingScreen(
                         onOpenPermissionSettings,
                         onCityQueryChanged,
                         onCitySelected
+                    )
+                    OnboardingStep.NOTIFICATIONS -> NotificationsStep(
+                        permissionRequired = notificationsPermissionRequired
+                    )
+                    OnboardingStep.EXACT_ALARMS -> ExactAlarmsStep(
+                        permissionRequired = exactAlarmPermissionRequired
                     )
                     OnboardingStep.SUMMARY -> SummaryStep(state)
                 }
@@ -254,7 +290,7 @@ private fun LocationStep(
         }
         if (state.locationMode == LocationMode.DEVICE) {
             when (val label = state.deviceNearestCityLabel) {
-                null -> Text("Finding nearest city…")
+                null -> Text("Finding nearest city...")
                 else -> Text("Nearest city: $label")
             }
 
@@ -266,6 +302,30 @@ private fun LocationStep(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NotificationsStep(permissionRequired: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "Suntime Alerts can send sunrise and sunset alerts. Android requires permission to post notifications. You can enable this now or skip and enable later in Settings."
+        )
+        if (!permissionRequired) {
+            Text("Not required on this Android version or already allowed.")
+        }
+    }
+}
+
+@Composable
+private fun ExactAlarmsStep(permissionRequired: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "To trigger alerts at the right time, Suntime Alerts schedules alarms. We'll open the Alarms & reminders settings so you can allow exact alarms. You can skip and enable later."
+        )
+        if (!permissionRequired) {
+            Text("Not required on this Android version or already allowed.")
         }
     }
 }

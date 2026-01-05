@@ -36,7 +36,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,7 +73,6 @@ import com.bfalls.suntimealerts.ui.theme.TextSecondary
 import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import com.bfalls.suntimealerts.utils.hasNotificationPermission
-import kotlinx.coroutines.launch
 
 
 class MainActivity : ComponentActivity() {
@@ -100,19 +98,20 @@ class MainActivity : ComponentActivity() {
             )
             val cityImportState by cityImportViewModel.state.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
-            var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
-            var hasEnabledAlarms by remember { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
+            var awaitingExactAlarmOnboardingResult by rememberSaveable { mutableStateOf(false) }
             var exactAlarmPermissionDialogReason by rememberSaveable { mutableStateOf<String?>(null) }
             val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
             val exactAlarmPermissionTracker = remember { ExactAlarmPermissionTracker(applicationContext) }
-            val coroutineScope = rememberCoroutineScope()
             val notificationPermissionLauncher =
                 rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
                 ) { granted ->
                     Log.d("MainActivity", "Notification permission result: granted=$granted")
+                    if (onboardingViewModel.state.value.step == OnboardingStep.NOTIFICATIONS) {
+                        onboardingViewModel.nextStep()
+                    }
                 }
             val lifecycleOwner = LocalLifecycleOwner.current
             val locationPermissionLauncher =
@@ -149,21 +148,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-            fun requestExactAlarmPermission(reason: String) {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-                if (!hasEnabledAlarms) return
-                if (alarmManager.canScheduleExactAlarms()) {
-                    exactAlarmPermissionTracker.reset()
-                    return
-                }
-                if (!exactAlarmPermissionTracker.canRequestExactAlarmPermission()) return
-                if (pendingExactAlarmPermissionRequest) return
-                if (exactAlarmPermissionDialogReason != null) return
-
-                Log.i("MainActivity", "Requesting exact alarm permission ($reason)")
-                exactAlarmPermissionDialogReason = reason
-            }
-
             DisposableEffect(
                 lifecycleOwner,
                 onboardingState.locationPermissionPermanentlyDenied
@@ -188,11 +172,6 @@ class MainActivity : ComponentActivity() {
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        coroutineScope.launch {
-                            val alarms = settingsStore.loadAlarms()
-                            hasEnabledAlarms = alarms.any { it.enabled }
-                        }
-
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             val canSchedule = alarmManager.canScheduleExactAlarms()
                             if (canSchedule) {
@@ -204,8 +183,15 @@ class MainActivity : ComponentActivity() {
                                 }
                                 pendingExactAlarmPermissionRequest = false
                             }
+                            if (awaitingExactAlarmOnboardingResult) {
+                                if (canSchedule) {
+                                    onboardingViewModel.nextStep()
+                                }
+                                awaitingExactAlarmOnboardingResult = false
+                            }
                         } else {
                             pendingExactAlarmPermissionRequest = false
+                            awaitingExactAlarmOnboardingResult = false
                         }
                     }
                 }
@@ -215,10 +201,6 @@ class MainActivity : ComponentActivity() {
                 onDispose {
                     lifecycleOwner.lifecycle.removeObserver(observer)
                 }
-            }
-
-            LaunchedEffect(Unit) {
-                hasEnabledAlarms = settingsStore.loadAlarms().any { it.enabled }
             }
 
             LaunchedEffect(
@@ -287,37 +269,12 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(
-                onboardingState.sunriseEnabled,
-                onboardingState.sunsetEnabled
-            ) {
-                hasEnabledAlarms = onboardingState.sunriseEnabled || onboardingState.sunsetEnabled
-            }
-
-            LaunchedEffect(
                 onboardingState.isLoaded,
                 onboardingState.onboardingComplete,
-                hasEnabledAlarms
-            ) {
-                if (
-                    onboardingState.isLoaded &&
-                    onboardingState.onboardingComplete &&
-                    hasEnabledAlarms &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    !hasNotificationPermission(context) &&
-                    !notificationPermissionRequested
-                ) {
-                    notificationPermissionRequested = true
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            }
-
-            LaunchedEffect(
-                onboardingState.isLoaded,
-                onboardingState.onboardingComplete,
-                hasEnabledAlarms
             ) {
                 if (onboardingState.isLoaded && onboardingState.onboardingComplete) {
-                    requestExactAlarmPermission("active-alerts")
+                    // No automatic notification or alarm permission prompts here;
+                    // these are handled during onboarding.
                 }
             }
 
@@ -352,6 +309,12 @@ class MainActivity : ComponentActivity() {
                                     onClick = {
                                         exactAlarmPermissionDialogReason = null
                                         pendingExactAlarmPermissionRequest = true
+                                        if (
+                                            onboardingState.step == OnboardingStep.EXACT_ALARMS &&
+                                            !onboardingState.onboardingComplete
+                                        ) {
+                                            awaitingExactAlarmOnboardingResult = true
+                                        }
                                         startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                                     },
                                     colors = ButtonDefaults.textButtonColors(
@@ -388,7 +351,7 @@ class MainActivity : ComponentActivity() {
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "Preparing Suntime Alerts…", color = TextPrimary)
+                                Text(text = "Preparing Suntime Alerts...", color = TextPrimary)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 CircularProgressIndicator(
                                     progress = { cityImportState.progress }
@@ -439,6 +402,42 @@ class MainActivity : ComponentActivity() {
                             },
                             onCityQueryChanged = onboardingViewModel::updateCityQuery,
                             onCitySelected = onboardingViewModel::selectCity,
+                            notificationsPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                !hasNotificationPermission(context),
+                            exactAlarmPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                !alarmManager.canScheduleExactAlarms(),
+                            onNotificationsContinue = {
+                                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                    onboardingViewModel.nextStep()
+                                    return@OnboardingScreen
+                                }
+                                if (hasNotificationPermission(context)) {
+                                    onboardingViewModel.nextStep()
+                                } else {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            },
+                            onNotificationsSkip = onboardingViewModel::nextStep,
+                            onExactAlarmsContinue = {
+                                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                                    onboardingViewModel.nextStep()
+                                    return@OnboardingScreen
+                                }
+                                if (alarmManager.canScheduleExactAlarms()) {
+                                    exactAlarmPermissionTracker.reset()
+                                    onboardingViewModel.nextStep()
+                                    return@OnboardingScreen
+                                }
+                                if (pendingExactAlarmPermissionRequest || exactAlarmPermissionDialogReason != null) {
+                                    return@OnboardingScreen
+                                }
+                                exactAlarmPermissionDialogReason = "onboarding"
+                            },
+                            onExactAlarmsSkip = {
+                                pendingExactAlarmPermissionRequest = false
+                                awaitingExactAlarmOnboardingResult = false
+                                onboardingViewModel.nextStep()
+                            },
                             onNext = onboardingViewModel::nextStep,
                             onBack = onboardingViewModel::previousStep,
                             onComplete = { onboardingViewModel.complete { } },

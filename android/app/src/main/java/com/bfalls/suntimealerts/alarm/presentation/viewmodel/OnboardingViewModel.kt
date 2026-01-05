@@ -34,7 +34,7 @@ data class OnboardingState(
     val sunsetOffsetMinutes: Int = 0
 )
 
-enum class OnboardingStep { WELCOME, LOCATION, SUMMARY }
+enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, EXACT_ALARMS, SUMMARY }
 
 enum class PermissionRequestOrigin { AUTOMATIC, USER }
 
@@ -71,13 +71,13 @@ class OnboardingViewModel(
     }
 
     fun nextStep() {
-        val next = OnboardingStep.values().getOrNull(_state.value.step.ordinal + 1) ?: return
+        val next = orderedSteps.getOrNull(orderedSteps.indexOf(_state.value.step) + 1) ?: return
         _state.value = _state.value.copy(step = next)
         handleStepChanged()
     }
 
     fun previousStep() {
-        val prev = OnboardingStep.values().getOrNull(_state.value.step.ordinal - 1) ?: return
+        val prev = orderedSteps.getOrNull(orderedSteps.indexOf(_state.value.step) - 1) ?: return
         _state.value = _state.value.copy(step = prev)
         handleStepChanged()
     }
@@ -266,6 +266,14 @@ class OnboardingViewModel(
         }
     }
 }
+
+private val orderedSteps = listOf(
+    OnboardingStep.WELCOME,
+    OnboardingStep.LOCATION,
+    OnboardingStep.NOTIFICATIONS,
+    OnboardingStep.EXACT_ALARMS,
+    OnboardingStep.SUMMARY
+)
 
 class OnboardingViewModelFactory(
     private val settingsStore: SettingsRepository,
