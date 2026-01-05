@@ -1,0 +1,198 @@
+# .github/ISSUE_TEMPLATE/bug_report.yml
+name: Bug report
+description: Report a reproducible problem in Suntime Alerts
+title: "[Bug]: "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+        Please provide enough detail to reproduce the issue. Incomplete reports may be closed.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight checklist
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I can reproduce this issue consistently.
+          required: true
+        - label: I am using the latest app version available to me.
+          required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android
+        - iOS
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: App version
+      description: App version, build number, or Git commit hash (if built from source)
+      placeholder: "e.g. 1.0.0 (Release) or commit abc1234"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      description: Device make/model (or emulator profile)
+      placeholder: "e.g. Pixel 8, Samsung S23, iPhone 14, Android Emulator Pixel 6"
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS version
+      description: Android/iOS version
+      placeholder: "e.g. Android 14, iOS 17.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: Install type
+      options:
+        - Play Store / App Store
+        - GitHub Release APK
+        - Built from source
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: theme_mode
+    attributes:
+      label: Theme mode
+      description: What theme mode was active when the issue occurred
+      options:
+        - System
+        - Light
+        - Dark
+        - Not sure
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: time_format
+    attributes:
+      label: System time format
+      description: System preference for time format
+      options:
+        - 12-hour
+        - 24-hour
+        - Not sure
+      default: 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: location_mode
+    attributes:
+      label: Location mode
+      description: How location is configured in the app
+      options:
+        - Device location
+        - Manual city search
+        - Not sure
+      default: 0
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: permissions
+    attributes:
+      label: Relevant permissions
+      description: Check what is enabled at the time of the bug (if known)
+      options:
+        - label: Location permission granted
+          required: false
+        - label: Notifications permission granted
+          required: false
+        - label: Alarms and reminders (exact alarms) granted
+          required: false
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear, one-paragraph description of the bug
+      placeholder: "What happened and what you expected to happen."
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that someone else can follow
+      placeholder: |
+        1. Open the app
+        2. Go to Settings
+        3. Change location to ...
+        4. Tap ...
+        5. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "Describe what should have happened."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "Describe what actually happened."
+    validations:
+      required: true
+
+  - type: textarea
+    id: frequency
+    attributes:
+      label: Frequency
+      description: How often does it happen
+      placeholder: "e.g. every time, 3/5 times, once so far"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional but helpful)
+      description: Paste relevant logs (adb logcat for Android). Please remove any sensitive info.
+      render: text
+      placeholder: |
+        Paste logs here. If possible, include the time range around the issue.
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or screen recording (optional)
+      description: Attach images or videos by dragging them into this box.
+      placeholder: "Drag and drop attachments here."
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context (optional)
+      description: Anything else that might help diagnose the issue
+      placeholder: "Network state, travel between time zones, battery optimization, etc."

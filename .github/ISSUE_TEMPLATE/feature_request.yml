@@ -1,0 +1,116 @@
+# .github/ISSUE_TEMPLATE/feature_request.yml
+name: Feature request
+description: Suggest an improvement or new capability for Suntime Alerts
+title: "[Feature]: "
+labels: ["enhancement"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Please focus on the user problem and desired outcome.
+        Requests without enough detail may be closed.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight checklist
+      options:
+        - label: I searched existing issues and did not find a duplicate request.
+          required: true
+        - label: This request aligns with the purpose of the app (sunrise/sunset alerts based on location).
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user problem are you trying to solve
+      placeholder: "As a user, I want ... because ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you want to happen, at a high level
+      placeholder: "Describe the change in plain language. Avoid implementation details if possible."
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User story and acceptance criteria
+      description: Define what "done" looks like
+      placeholder: |
+        User story:
+        - As a ..., I want ..., so that ...
+
+        Acceptance criteria:
+        - [ ] ...
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android
+        - iOS
+        - Both
+        - Not sure
+      default: 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority (your perspective)
+      options:
+        - Nice to have
+        - Important
+        - Critical
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve the same problem (including "do nothing")
+      placeholder: "List alternatives, tradeoffs, or why the current behavior is insufficient."
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope notes (optional)
+      description: Any relevant constraints, edge cases, or non-goals
+      placeholder: |
+        Examples:
+        - Must work offline
+        - Must respect system 12/24h preference
+        - Should not require background location
+        - Non-goals: ...
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups or examples (optional)
+      description: Links or screenshots showing similar behavior in other apps are helpful.
+      placeholder: "Drag and drop images here or provide links."
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation thoughts (optional)
+      description: If you have technical suggestions, include them here. Keep it brief.
+      placeholder: "Optional."
