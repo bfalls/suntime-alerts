@@ -19,17 +19,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Alarm
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,9 +58,7 @@ import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
 import com.bfalls.suntimealerts.ui.theme.SplashBackground
-import com.bfalls.suntimealerts.ui.theme.SurfacePrimary
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
-import com.bfalls.suntimealerts.ui.theme.SunriseAccent
 import com.bfalls.suntimealerts.ui.theme.TextPrimary
 import com.bfalls.suntimealerts.ui.theme.TextSecondary
 import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
@@ -101,7 +92,6 @@ class MainActivity : ComponentActivity() {
             var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
             var awaitingExactAlarmOnboardingResult by rememberSaveable { mutableStateOf(false) }
-            var exactAlarmPermissionDialogReason by rememberSaveable { mutableStateOf<String?>(null) }
             val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
             val exactAlarmPermissionTracker = remember { ExactAlarmPermissionTracker(applicationContext) }
             val notificationPermissionLauncher =
@@ -283,66 +273,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (exactAlarmPermissionDialogReason != null) {
-                        AlertDialog(
-                            onDismissRequest = { exactAlarmPermissionDialogReason = null },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Outlined.Alarm,
-                                    contentDescription = null
-                                )
-                            },
-                            title = {
-                                Text(
-                                    text = "Allow alarms & reminders",
-                                    style = MaterialTheme.typography.titleLarge
-                                )
-                            },
-                            text = {
-                                Text(
-                                    "Suntime Alerts needs permission to schedule alarms. " +
-                                        "We'll open the Alarms & reminders settings so you can enable this."
-                                )
-                            },
-                            confirmButton = {
-                                TextButton(
-                                    onClick = {
-                                        exactAlarmPermissionDialogReason = null
-                                        pendingExactAlarmPermissionRequest = true
-                                        if (
-                                            onboardingState.step == OnboardingStep.EXACT_ALARMS &&
-                                            !onboardingState.onboardingComplete
-                                        ) {
-                                            awaitingExactAlarmOnboardingResult = true
-                                        }
-                                        startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                                    },
-                                    colors = ButtonDefaults.textButtonColors(
-                                        contentColor = SunriseAccent
-                                    )
-                                ) {
-                                    Text("Continue")
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(
-                                    onClick = { exactAlarmPermissionDialogReason = null },
-                                    colors = ButtonDefaults.textButtonColors(
-                                        contentColor = TextSecondary
-                                    )
-                                ) {
-                                    Text("Not now")
-                                }
-                            },
-                            shape = RoundedCornerShape(24.dp),
-                            containerColor = SurfacePrimary,
-                            iconContentColor = SunriseAccent,
-                            titleContentColor = TextPrimary,
-                            textContentColor = TextSecondary,
-                            tonalElevation = 6.dp
-                        )
-                    }
-
                     when {
                         cityImportState.isImporting -> Box(
                             modifier = Modifier
@@ -428,10 +358,17 @@ class MainActivity : ComponentActivity() {
                                     onboardingViewModel.nextStep()
                                     return@OnboardingScreen
                                 }
-                                if (pendingExactAlarmPermissionRequest || exactAlarmPermissionDialogReason != null) {
+                                if (pendingExactAlarmPermissionRequest) {
                                     return@OnboardingScreen
                                 }
-                                exactAlarmPermissionDialogReason = "onboarding"
+                                pendingExactAlarmPermissionRequest = true
+                                if (
+                                    onboardingState.step == OnboardingStep.EXACT_ALARMS &&
+                                    !onboardingState.onboardingComplete
+                                ) {
+                                    awaitingExactAlarmOnboardingResult = true
+                                }
+                                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                             },
                             onExactAlarmsSkip = {
                                 pendingExactAlarmPermissionRequest = false
