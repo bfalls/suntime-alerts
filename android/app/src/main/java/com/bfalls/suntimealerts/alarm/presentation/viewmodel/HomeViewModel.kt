@@ -9,6 +9,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.domain.service.MoonEphemeris
 import com.bfalls.suntimealerts.alarm.domain.service.MoonTimesCalculator
@@ -54,6 +55,7 @@ class HomeViewModel(
         val moonIllumination01: Double = 0.0,
         val moonIsWaxing: Boolean = true,
         val now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault()),
+        val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
         val error: String? = null
     )
 
@@ -70,6 +72,10 @@ class HomeViewModel(
     private var cachedSettings: UserSettings? = null
 
     init {
+        viewModelScope.launch { loadState() }
+    }
+
+    fun refresh() {
         viewModelScope.launch { loadState() }
     }
 
@@ -161,7 +167,8 @@ class HomeViewModel(
                     sunriseTime = placeholderSunTimes.sunrise,
                     sunsetTime = placeholderSunTimes.sunset,
                     sunriseTimeText = formatTime(placeholderSunTimes.sunrise, settings.timeFormat24h),
-                    sunsetTimeText = formatTime(placeholderSunTimes.sunset, settings.timeFormat24h)
+                    sunsetTimeText = formatTime(placeholderSunTimes.sunset, settings.timeFormat24h),
+                    skyBodySize = settings.skyBodySize
                 )
             }
 
@@ -238,6 +245,7 @@ class HomeViewModel(
                 moonMaxAltDeg = moonWindow?.maxAltDeg ?: current.moonMaxAltDeg,
                 moonIllumination01 = moonPhase.illumination01,
                 moonIsWaxing = moonPhase.isWaxing,
+                skyBodySize = resolvedSettings.skyBodySize,
                 now = now,
                 error = if (coordinate == null) "Location unavailable" else null
             )

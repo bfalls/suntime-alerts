@@ -20,6 +20,18 @@ enum class LocationMode {
     FIXED;
 }
 
+enum class AppThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK
+}
+
+enum class SkyBodySize {
+    SMALL,
+    MEDIUM,
+    LARGE
+}
+
 data class UserSettings(
     val locationMode: LocationMode,
     val fixedLocation: Coordinate? = null,
@@ -27,5 +39,7 @@ data class UserSettings(
     val sunsetConfig: SunAlarmConfig,
     val timeFormat24h: Boolean,
     val onboardingComplete: Boolean,
-    val alarms: List<SunAlarm> = emptyList()
+    val alarms: List<SunAlarm> = emptyList(),
+    val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
+    val appThemeMode: AppThemeMode = AppThemeMode.SYSTEM
 )

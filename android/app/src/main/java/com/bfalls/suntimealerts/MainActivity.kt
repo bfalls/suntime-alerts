@@ -13,7 +13,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -44,45 +46,56 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bfalls.suntimealerts.alarm.data.LocationService
 import com.bfalls.suntimealerts.alarm.data.SettingsStore
 import com.bfalls.suntimealerts.alarm.data.SunScheduleService
+import com.bfalls.suntimealerts.alarm.domain.model.AppThemeMode
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.presentation.ui.HomeScreen
 import com.bfalls.suntimealerts.alarm.presentation.ui.OnboardingScreen
+import com.bfalls.suntimealerts.alarm.presentation.ui.SettingsScreen
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingStep
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingViewModel
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingViewModelFactory
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.PermissionRequestOrigin
+import com.bfalls.suntimealerts.alarm.presentation.viewmodel.SettingsViewModel
+import com.bfalls.suntimealerts.alarm.presentation.viewmodel.SettingsViewModelFactory
 import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
-import com.bfalls.suntimealerts.ui.theme.SplashBackground
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
-import com.bfalls.suntimealerts.ui.theme.TextPrimary
-import com.bfalls.suntimealerts.ui.theme.TextSecondary
 import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import com.bfalls.suntimealerts.utils.hasNotificationPermission
+import kotlinx.coroutines.runBlocking
 
 
 class MainActivity : ComponentActivity() {
+    private val settingsStore: SettingsStore by lazy { SettingsStore(applicationContext) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        runBlocking {
+            applyAppThemeMode(settingsStore.load().appThemeMode)
+        }
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
-            val settingsStore = remember { SettingsStore(applicationContext) }
+            val settingsStore = remember { this@MainActivity.settingsStore }
             val locationService = remember { LocationService(application) }
             val notificationScheduler = remember { NotificationScheduler(applicationContext) }
             val sunTimesCalculator = remember { SunTimesCalculator() }
             val scheduleService = remember { SunScheduleService(sunTimesCalculator, settingsStore, notificationScheduler) }
             val cityRepository = remember { CityRepository(applicationContext) }
             val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService, sunTimesCalculator) }
+            val settingsViewModel: SettingsViewModel = viewModel(
+                factory = SettingsViewModelFactory(settingsStore, cityRepository, locationService, applicationContext)
+            )
             val onboardingViewModel: OnboardingViewModel = viewModel(
                 factory = OnboardingViewModelFactory(settingsStore, cityRepository, locationService)
             )
+            val settingsState by settingsViewModel.state.collectAsState()
             val onboardingState by onboardingViewModel.state.collectAsState()
             val cityImportViewModel: CityImportViewModel = viewModel(
                 factory = CityImportViewModelFactory(cityRepository)
@@ -92,6 +105,7 @@ class MainActivity : ComponentActivity() {
             var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
             var awaitingExactAlarmOnboardingResult by rememberSaveable { mutableStateOf(false) }
+            var showSettings by rememberSaveable { mutableStateOf(false) }
             val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
             val exactAlarmPermissionTracker = remember { ExactAlarmPermissionTracker(applicationContext) }
             val notificationPermissionLauncher =
@@ -268,7 +282,24 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            SuntimeAlertsTheme {
+            LaunchedEffect(onboardingState.onboardingComplete) {
+                if (!onboardingState.onboardingComplete) {
+                    showSettings = false
+                }
+            }
+
+            val appThemeMode = settingsState.appThemeMode
+            val darkTheme = when (appThemeMode) {
+                AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
+
+            LaunchedEffect(appThemeMode) {
+                applyAppThemeMode(appThemeMode)
+            }
+
+            SuntimeAlertsTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -277,11 +308,14 @@ class MainActivity : ComponentActivity() {
                         cityImportState.isImporting -> Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(SplashBackground),
+                                .background(MaterialTheme.colorScheme.background),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "Preparing Suntime Alerts...", color = TextPrimary)
+                                Text(
+                                    text = "Preparing Suntime Alerts...",
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 CircularProgressIndicator(
                                     progress = { cityImportState.progress }
@@ -290,99 +324,123 @@ class MainActivity : ComponentActivity() {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "${cityImportState.current} / ${cityImportState.total}",
-                                        color = TextSecondary
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                         }
                         !onboardingState.isLoaded -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                        onboardingState.onboardingComplete -> HomeScreen(viewModel = homeViewModel)
-                        else -> OnboardingScreen(
-                            state = onboardingState,
-                            onLocationModeChanged = { mode ->
-                                when (mode) {
-                                    LocationMode.DEVICE -> {
-                                        onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
+                        !onboardingState.onboardingComplete -> {
+                            OnboardingScreen(
+                                state = onboardingState,
+                                onLocationModeChanged = { mode ->
+                                    when (mode) {
+                                        LocationMode.DEVICE -> {
+                                            onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
 
-                                        if (hasLocationPermission(context)) {
-                                            // Already granted → just switch to device mode
-                                            onboardingViewModel.clearLocationPermissionDenial()
-                                            return@OnboardingScreen
-                                        }
+                                            if (hasLocationPermission(context)) {
+                                                // Already granted → just switch to device mode
+                                                onboardingViewModel.clearLocationPermissionDenial()
+                                                return@OnboardingScreen
+                                            }
 
-                                        // Trigger system permission dialog after the UI switches to device mode
-                                        permissionRequestOrigin = PermissionRequestOrigin.USER
-                                        locationPermissionLauncher.launch(
-                                            arrayOf(
-                                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            // Trigger system permission dialog after the UI switches to device mode
+                                            permissionRequestOrigin = PermissionRequestOrigin.USER
+                                            locationPermissionLauncher.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                                )
                                             )
-                                        )
+                                        }
+                                        LocationMode.FIXED -> {
+                                            onboardingViewModel.updateLocationMode(LocationMode.FIXED)
+                                        }
                                     }
-                                    LocationMode.FIXED -> {
-                                        onboardingViewModel.updateLocationMode(LocationMode.FIXED)
+                                },
+                                onOpenPermissionSettings = {
+                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = Uri.fromParts("package", packageName, null)
                                     }
-                                }
-                            },
-                            onOpenPermissionSettings = {
-                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.fromParts("package", packageName, null)
-                                }
-                                startActivity(intent)
-                            },
-                            onCityQueryChanged = onboardingViewModel::updateCityQuery,
-                            onCitySelected = onboardingViewModel::selectCity,
-                            notificationsPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                !hasNotificationPermission(context),
-                            exactAlarmPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                                !alarmManager.canScheduleExactAlarms(),
-                            onNotificationsContinue = {
-                                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                    startActivity(intent)
+                                },
+                                onCityQueryChanged = onboardingViewModel::updateCityQuery,
+                                onCitySelected = onboardingViewModel::selectCity,
+                                notificationsPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    !hasNotificationPermission(context),
+                                exactAlarmPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                                    !alarmManager.canScheduleExactAlarms(),
+                                onNotificationsContinue = {
+                                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                        onboardingViewModel.nextStep()
+                                        return@OnboardingScreen
+                                    }
+                                    if (hasNotificationPermission(context)) {
+                                        onboardingViewModel.nextStep()
+                                    } else {
+                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                },
+                                onNotificationsSkip = onboardingViewModel::nextStep,
+                                onExactAlarmsContinue = {
+                                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                                        onboardingViewModel.nextStep()
+                                        return@OnboardingScreen
+                                    }
+                                    if (alarmManager.canScheduleExactAlarms()) {
+                                        exactAlarmPermissionTracker.reset()
+                                        onboardingViewModel.nextStep()
+                                        return@OnboardingScreen
+                                    }
+                                    if (pendingExactAlarmPermissionRequest) {
+                                        return@OnboardingScreen
+                                    }
+                                    pendingExactAlarmPermissionRequest = true
+                                    if (
+                                        onboardingState.step == OnboardingStep.EXACT_ALARMS &&
+                                        !onboardingState.onboardingComplete
+                                    ) {
+                                        awaitingExactAlarmOnboardingResult = true
+                                    }
+                                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                },
+                                onExactAlarmsSkip = {
+                                    pendingExactAlarmPermissionRequest = false
+                                    awaitingExactAlarmOnboardingResult = false
                                     onboardingViewModel.nextStep()
-                                    return@OnboardingScreen
-                                }
-                                if (hasNotificationPermission(context)) {
-                                    onboardingViewModel.nextStep()
-                                } else {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
+                                },
+                                onNext = onboardingViewModel::nextStep,
+                                onBack = onboardingViewModel::previousStep,
+                                onComplete = { onboardingViewModel.complete { } },
+                                canAdvance = onboardingViewModel.canAdvance()
+                            )
+                        }
+                        showSettings -> SettingsScreen(
+                            viewModel = settingsViewModel,
+                            onBack = { showSettings = false },
+                            onLocationUpdated = {
+                                homeViewModel.refresh()
                             },
-                            onNotificationsSkip = onboardingViewModel::nextStep,
-                            onExactAlarmsContinue = {
-                                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                                    onboardingViewModel.nextStep()
-                                    return@OnboardingScreen
-                                }
-                                if (alarmManager.canScheduleExactAlarms()) {
-                                    exactAlarmPermissionTracker.reset()
-                                    onboardingViewModel.nextStep()
-                                    return@OnboardingScreen
-                                }
-                                if (pendingExactAlarmPermissionRequest) {
-                                    return@OnboardingScreen
-                                }
-                                pendingExactAlarmPermissionRequest = true
-                                if (
-                                    onboardingState.step == OnboardingStep.EXACT_ALARMS &&
-                                    !onboardingState.onboardingComplete
-                                ) {
-                                    awaitingExactAlarmOnboardingResult = true
-                                }
-                                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                            },
-                            onExactAlarmsSkip = {
-                                pendingExactAlarmPermissionRequest = false
-                                awaitingExactAlarmOnboardingResult = false
-                                onboardingViewModel.nextStep()
-                            },
-                            onNext = onboardingViewModel::nextStep,
-                            onBack = onboardingViewModel::previousStep,
-                            onComplete = { onboardingViewModel.complete { } },
-                            canAdvance = onboardingViewModel.canAdvance()
+                            onSkyBodySizeUpdated = {
+                                homeViewModel.refresh()
+                            }
+                        )
+                        else -> HomeScreen(
+                            viewModel = homeViewModel,
+                            onOpenSettings = { showSettings = true }
                         )
                     }
                 }
             }
         }
+    }
+
+    private fun applyAppThemeMode(mode: AppThemeMode) {
+        val nightMode = when (mode) {
+            AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+            AppThemeMode.DARK -> AppCompatDelegate.MODE_NIGHT_YES
+        }
+        AppCompatDelegate.setDefaultNightMode(nightMode)
     }
 }
