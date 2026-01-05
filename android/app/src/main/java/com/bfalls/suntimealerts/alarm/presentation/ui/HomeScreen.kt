@@ -109,6 +109,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import android.text.format.DateFormat
 import com.bfalls.suntimealerts.R
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
@@ -132,6 +133,7 @@ import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
 import java.time.DayOfWeek
+import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -269,7 +271,7 @@ fun HomeScreenContent(
                     contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
                     stickyHeader {
-                        AlarmSectionHeader(title = "Sunrise", timeText = state.sunriseTimeText)
+                        AlarmSectionHeader(title = "Sunrise", time = state.sunriseTime)
                     }
                     items(state.sunriseAlarms, key = { it.id }) { alarm ->
                         AlarmRow(
@@ -296,7 +298,7 @@ fun HomeScreenContent(
                     }
                     item { Spacer(modifier = Modifier.height(16.dp)) }
                     stickyHeader {
-                        AlarmSectionHeader(title = "Sunset", timeText = state.sunsetTimeText)
+                        AlarmSectionHeader(title = "Sunset", time = state.sunsetTime)
                     }
                     items(state.sunsetAlarms, key = { it.id }) { alarm ->
                         AlarmRow(
@@ -347,9 +349,18 @@ fun HomeScreenContent(
 @Composable
 private fun AlarmSectionHeader(
     title: String,
-    timeText: String?,
+    time: ZonedDateTime?,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val timeText = time?.let {
+        val is24Hour = DateFormat.is24HourFormat(context)
+        val pattern = if (is24Hour) "HH:mm" else "h:mm a"
+        val formatter = DateTimeFormatter.ofPattern(pattern)
+        it.format(formatter)
+    }
+    val headerText = timeText?.let { "$title at $it" } ?: title
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -358,16 +369,11 @@ private fun AlarmSectionHeader(
             .background(MaterialTheme.colorScheme.primary)
             .padding(vertical = 10.dp, horizontal = 12.dp)
     ) {
-        Column {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
-            timeText?.let {
-                Text(text = it, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f))
-            }
-        }
+        Text(
+            text = headerText,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimary
+        )
     }
 }
 
@@ -1225,7 +1231,7 @@ private fun AlarmLists(
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         stickyHeader {
-            AlarmSectionHeader(title = "Sunrise", timeText = state.sunriseTimeText)
+            AlarmSectionHeader(title = "Sunrise", time = state.sunriseTime)
         }
         items(state.sunriseAlarms, key = { it.id }) { alarm ->
             AlarmRow(
@@ -1252,7 +1258,7 @@ private fun AlarmLists(
         }
         item { Spacer(modifier = Modifier.height(16.dp)) }
         stickyHeader {
-            AlarmSectionHeader(title = "Sunset", timeText = state.sunsetTimeText)
+            AlarmSectionHeader(title = "Sunset", time = state.sunsetTime)
         }
         items(state.sunsetAlarms, key = { it.id }) { alarm ->
             AlarmRow(

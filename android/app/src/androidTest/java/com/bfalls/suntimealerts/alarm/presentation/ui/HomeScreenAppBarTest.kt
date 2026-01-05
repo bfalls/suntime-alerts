@@ -75,8 +75,8 @@ class HomeScreenAppBarTest {
         }
 
         composeTestRule.onNodeWithTag("sky_appbar_background").assertExists()
-        composeTestRule.onNodeWithText("Sunrise").assertExists()
-        composeTestRule.onNodeWithText("Sunset").assertExists()
+        composeTestRule.onNodeWithText("Sunrise", substring = true).assertExists()
+        composeTestRule.onNodeWithText("Sunset", substring = true).assertExists()
         composeTestRule.onNodeWithText(formatOffset(30)).assertExists()
         composeTestRule.onNodeWithText(formatOffset(-15)).assertExists()
     }
