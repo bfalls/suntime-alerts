@@ -50,7 +50,7 @@ class SettingsStore(private val context: Context) : SettingsRepository {
         } else {
             migrateAlarms(prefs).also { saveAlarms(it) }
         }
-        val sunriseEnabled = alarms.firstOrNull { it.type == SunEventType.SUNRISE }?.enabled ?: true
+        val sunriseEnabled = alarms.firstOrNull { it.type == SunEventType.SUNRISE }?.enabled ?: false
         val sunsetEnabled = alarms.firstOrNull { it.type == SunEventType.SUNSET }?.enabled ?: false
         val sunriseConfig = SunAlarmConfig(
             enabled = sunriseEnabled,
@@ -130,12 +130,17 @@ class SettingsStore(private val context: Context) : SettingsRepository {
         }
     }
 
-    private fun migrateAlarms(prefs: Preferences): List<SunAlarm> = migrateLegacyAlarms(
-        sunriseOffset = prefs[sunriseOffset] ?: 0,
-        sunsetOffset = prefs[sunsetOffset] ?: 0,
-        sunriseEnabled = true,
-        sunsetEnabled = false
-    )
+    private fun migrateAlarms(prefs: Preferences): List<SunAlarm> {
+        val hasLegacyOffsets = prefs.contains(sunriseOffset) || prefs.contains(sunsetOffset)
+        if (!hasLegacyOffsets) return emptyList()
+
+        return migrateLegacyAlarms(
+            sunriseOffset = prefs[sunriseOffset] ?: 0,
+            sunsetOffset = prefs[sunsetOffset] ?: 0,
+            sunriseEnabled = false,
+            sunsetEnabled = false
+        )
+    }
 }
 
 internal fun migrateLegacyAlarms(

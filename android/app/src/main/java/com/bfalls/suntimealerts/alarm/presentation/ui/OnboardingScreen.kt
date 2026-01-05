@@ -35,9 +35,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -54,13 +52,15 @@ import com.bfalls.suntimealerts.cities.data.City
 fun OnboardingScreen(
     state: OnboardingState,
     onLocationModeChanged: (LocationMode) -> Unit,
-    onSunriseEnabledChanged: (Boolean) -> Unit,
-    onSunsetEnabledChanged: (Boolean) -> Unit,
-    onSunriseOffsetChanged: (Int) -> Unit,
-    onSunsetOffsetChanged: (Int) -> Unit,
     onOpenPermissionSettings: () -> Unit,
     onCityQueryChanged: (String) -> Unit,
     onCitySelected: (City) -> Unit,
+    notificationsPermissionRequired: Boolean,
+    exactAlarmPermissionRequired: Boolean,
+    onNotificationsContinue: () -> Unit,
+    onNotificationsSkip: () -> Unit,
+    onExactAlarmsContinue: () -> Unit,
+    onExactAlarmsSkip: () -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit,
     onComplete: () -> Unit,
@@ -85,11 +85,33 @@ fun OnboardingScreen(
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
                         }
-                        Button(
-                            onClick = { if (state.step == OnboardingStep.SUMMARY) onComplete() else onNext() },
-                            enabled = canAdvance
-                        ) {
-                            Text(if (state.step == OnboardingStep.SUMMARY) "Save & Start" else "Next")
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            when (state.step) {
+                                OnboardingStep.NOTIFICATIONS -> {
+                                    OutlinedButton(onClick = onNotificationsSkip) {
+                                        Text("Skip")
+                                    }
+                                    Button(onClick = onNotificationsContinue) {
+                                        Text("Continue")
+                                    }
+                                }
+                                OnboardingStep.EXACT_ALARMS -> {
+                                    OutlinedButton(onClick = onExactAlarmsSkip) {
+                                        Text("Skip")
+                                    }
+                                    Button(onClick = onExactAlarmsContinue) {
+                                        Text("Continue")
+                                    }
+                                }
+                                else -> {
+                                    Button(
+                                        onClick = { if (state.step == OnboardingStep.SUMMARY) onComplete() else onNext() },
+                                        enabled = canAdvance
+                                    ) {
+                                        Text(if (state.step == OnboardingStep.SUMMARY) "Save & Start" else "Next")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -107,7 +129,8 @@ fun OnboardingScreen(
                     text = when (state.step) {
                         OnboardingStep.WELCOME -> "Welcome"
                         OnboardingStep.LOCATION -> "Choose location"
-                        OnboardingStep.ALARMS -> "Initial alarms"
+                        OnboardingStep.NOTIFICATIONS -> "Notifications"
+                        OnboardingStep.EXACT_ALARMS -> "Alarms & reminders"
                         OnboardingStep.SUMMARY -> "Summary"
                     },
                     fontWeight = FontWeight.SemiBold
@@ -122,7 +145,12 @@ fun OnboardingScreen(
                         onCityQueryChanged,
                         onCitySelected
                     )
-                    OnboardingStep.ALARMS -> AlarmStep(state, onSunriseEnabledChanged, onSunsetEnabledChanged, onSunriseOffsetChanged, onSunsetOffsetChanged)
+                    OnboardingStep.NOTIFICATIONS -> NotificationsStep(
+                        permissionRequired = notificationsPermissionRequired
+                    )
+                    OnboardingStep.EXACT_ALARMS -> ExactAlarmsStep(
+                        permissionRequired = exactAlarmPermissionRequired
+                    )
                     OnboardingStep.SUMMARY -> SummaryStep(state)
                 }
             }
@@ -262,7 +290,7 @@ private fun LocationStep(
         }
         if (state.locationMode == LocationMode.DEVICE) {
             when (val label = state.deviceNearestCityLabel) {
-                null -> Text("Finding nearest city…")
+                null -> Text("Finding nearest city...")
                 else -> Text("Nearest city: $label")
             }
 
@@ -279,35 +307,25 @@ private fun LocationStep(
 }
 
 @Composable
-private fun AlarmStep(
-    state: OnboardingState,
-    onSunriseEnabledChanged: (Boolean) -> Unit,
-    onSunsetEnabledChanged: (Boolean) -> Unit,
-    onSunriseOffsetChanged: (Int) -> Unit,
-    onSunsetOffsetChanged: (Int) -> Unit
-) {
+private fun NotificationsStep(permissionRequired: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Sunrise alarm")
-                Text("Offset: ${state.sunriseOffsetMinutes} min")
-            }
-            Switch(checked = state.sunriseEnabled, onCheckedChange = onSunriseEnabledChanged)
+        Text(
+            "Suntime Alerts can send sunrise and sunset alerts. Android requires permission to post notifications. You can enable this now or skip and enable later in Settings."
+        )
+        if (!permissionRequired) {
+            Text("Not required on this Android version or already allowed.")
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { onSunriseOffsetChanged(state.sunriseOffsetMinutes - 5) }) { Text("-5m") }
-            TextButton(onClick = { onSunriseOffsetChanged(state.sunriseOffsetMinutes + 5) }) { Text("+5m") }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Sunset alarm")
-                Text("Offset: ${state.sunsetOffsetMinutes} min")
-            }
-            Switch(checked = state.sunsetEnabled, onCheckedChange = onSunsetEnabledChanged)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = { onSunsetOffsetChanged(state.sunsetOffsetMinutes - 5) }) { Text("-5m") }
-            TextButton(onClick = { onSunsetOffsetChanged(state.sunsetOffsetMinutes + 5) }) { Text("+5m") }
+    }
+}
+
+@Composable
+private fun ExactAlarmsStep(permissionRequired: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "To trigger alerts at the right time, Suntime Alerts schedules alarms. We'll open the Alarms & reminders settings so you can allow exact alarms. You can skip and enable later."
+        )
+        if (!permissionRequired) {
+            Text("Not required on this Android version or already allowed.")
         }
     }
 }
@@ -325,7 +343,5 @@ private fun SummaryStep(state: OnboardingState) {
             }
         }
         Text("Location: $locationSummary")
-        Text("Sunrise alarm: ${if (state.sunriseEnabled) "On" else "Off"} @ ${state.sunriseOffsetMinutes} min")
-        Text("Sunset alarm: ${if (state.sunsetEnabled) "On" else "Off"} @ ${state.sunsetOffsetMinutes} min")
     }
 }
