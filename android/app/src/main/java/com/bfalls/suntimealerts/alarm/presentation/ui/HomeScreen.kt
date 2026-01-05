@@ -50,7 +50,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -764,10 +763,7 @@ private fun AlarmEditorSheet(
                                     onClick = {
                                         onDelete(initialAlarm)
                                         onDismiss()
-                                    },
-                                    colors = IconButtonDefaults.iconButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error
-                                    )
+                                    }
                                 ) {
                                     Icon(Icons.Default.Delete, contentDescription = "Delete alarm")
                                 }
