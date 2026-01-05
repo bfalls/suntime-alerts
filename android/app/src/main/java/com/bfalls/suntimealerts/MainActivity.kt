@@ -437,32 +437,6 @@ class MainActivity : ComponentActivity() {
                                 }
                                 startActivity(intent)
                             },
-                            onSunriseEnabledChanged = { enabled ->
-                                onboardingViewModel.updateSunriseEnabled(enabled)
-                                hasEnabledAlarms = enabled || onboardingState.sunsetEnabled
-                                if (
-                                    hasEnabledAlarms &&
-                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                    !hasNotificationPermission(context)
-                                ) {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                                requestExactAlarmPermission("sunrise-toggle")
-                            },
-                            onSunsetEnabledChanged = { enabled ->
-                                onboardingViewModel.updateSunsetEnabled(enabled)
-                                hasEnabledAlarms = onboardingState.sunriseEnabled || enabled
-                                if (
-                                    hasEnabledAlarms &&
-                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                    !hasNotificationPermission(context)
-                                ) {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                                requestExactAlarmPermission("sunset-toggle")
-                            },
-                            onSunriseOffsetChanged = onboardingViewModel::updateSunriseOffset,
-                            onSunsetOffsetChanged = onboardingViewModel::updateSunsetOffset,
                             onCityQueryChanged = onboardingViewModel::updateCityQuery,
                             onCitySelected = onboardingViewModel::selectCity,
                             onNext = onboardingViewModel::nextStep,

@@ -6,12 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.bfalls.suntimealerts.alarm.data.LocationProvider
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
-import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
-import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNRISE_ALARM_ID
-import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNSET_ALARM_ID
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
-import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
-import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.cities.data.City
 import com.bfalls.suntimealerts.cities.data.CityRepository
@@ -33,13 +28,13 @@ data class OnboardingState(
     val cityQuery: String = "",
     val cityResults: List<City> = emptyList(),
     val selectedCity: City? = null,
-    val sunriseEnabled: Boolean = true,
+    val sunriseEnabled: Boolean = false,
     val sunriseOffsetMinutes: Int = 0,
     val sunsetEnabled: Boolean = false,
     val sunsetOffsetMinutes: Int = 0
 )
 
-enum class OnboardingStep { WELCOME, LOCATION, ALARMS, SUMMARY }
+enum class OnboardingStep { WELCOME, LOCATION, SUMMARY }
 
 enum class PermissionRequestOrigin { AUTOMATIC, USER }
 
@@ -60,7 +55,7 @@ class OnboardingViewModel(
 
     private suspend fun load() {
         val settings = settingsStore.load()
-        val sunriseEnabled = settings.alarms.firstOrNull { it.type == SunEventType.SUNRISE }?.enabled ?: true
+        val sunriseEnabled = settings.alarms.firstOrNull { it.type == SunEventType.SUNRISE }?.enabled ?: false
         val sunsetEnabled = settings.alarms.firstOrNull { it.type == SunEventType.SUNSET }?.enabled ?: false
         _state.value = _state.value.copy(
             isLoaded = true,
@@ -208,46 +203,10 @@ class OnboardingViewModel(
     fun complete(onFinished: () -> Unit) {
         viewModelScope.launch {
             var settings = settingsStore.load()
-            val existingAlarmsByType = settings.alarms.associateBy { it.type }
             val onboardingState = _state.value
-            val updatedAlarms = listOf(
-                SunAlarm(
-                    id = existingAlarmsByType[SunEventType.SUNRISE]?.id
-                        ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNRISE }?.id
-                        ?: DEFAULT_SUNRISE_ALARM_ID,
-                    type = SunEventType.SUNRISE,
-                    offsetMinutes = onboardingState.sunriseOffsetMinutes,
-                    label = existingAlarmsByType[SunEventType.SUNRISE]?.label ?: "Sunrise",
-                    enabled = onboardingState.sunriseEnabled,
-                    recurrenceDays = ALL_DAYS_MASK,
-                    vibrate = true
-                ),
-                SunAlarm(
-                    id = existingAlarmsByType[SunEventType.SUNSET]?.id
-                        ?: existingAlarmsByType.values.firstOrNull { it.type == SunEventType.SUNSET }?.id
-                        ?: DEFAULT_SUNSET_ALARM_ID,
-                    type = SunEventType.SUNSET,
-                    offsetMinutes = onboardingState.sunsetOffsetMinutes,
-                    label = existingAlarmsByType[SunEventType.SUNSET]?.label ?: "Sunset",
-                    enabled = onboardingState.sunsetEnabled,
-                    recurrenceDays = ALL_DAYS_MASK,
-                    vibrate = true
-                )
-            )
             settings = settings.copy(
                 locationMode = if (_state.value.locationMode == LocationMode.FIXED) LocationMode.FIXED else LocationMode.DEVICE,
-                sunriseConfig = SunAlarmConfig(
-                    enabled = onboardingState.sunriseEnabled,
-                    eventType = SunEventType.SUNRISE,
-                    offsetMinutes = onboardingState.sunriseOffsetMinutes
-                ),
-                sunsetConfig = SunAlarmConfig(
-                    enabled = onboardingState.sunsetEnabled,
-                    eventType = SunEventType.SUNSET,
-                    offsetMinutes = onboardingState.sunsetOffsetMinutes
-                ),
-                onboardingComplete = true,
-                alarms = updatedAlarms
+                onboardingComplete = true
             )
             if (settings.locationMode == LocationMode.FIXED) {
                 val lat = onboardingState.fixedLatitude.toDoubleOrNull() ?: 0.0
