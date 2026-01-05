@@ -287,14 +287,21 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(
+                onboardingState.sunriseEnabled,
+                onboardingState.sunsetEnabled
+            ) {
+                hasEnabledAlarms = onboardingState.sunriseEnabled || onboardingState.sunsetEnabled
+            }
+
+            LaunchedEffect(
                 onboardingState.isLoaded,
                 onboardingState.onboardingComplete,
-                onboardingState.notificationsEnabled
+                hasEnabledAlarms
             ) {
                 if (
                     onboardingState.isLoaded &&
                     onboardingState.onboardingComplete &&
-                    onboardingState.notificationsEnabled &&
+                    hasEnabledAlarms &&
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     !hasNotificationPermission(context) &&
                     !notificationPermissionRequested
@@ -430,20 +437,30 @@ class MainActivity : ComponentActivity() {
                                 }
                                 startActivity(intent)
                             },
-                            onNotificationsChanged = { enabled ->
-                                onboardingViewModel.updateNotifications(enabled)
-                                hasEnabledAlarms = enabled
+                            onSunriseEnabledChanged = { enabled ->
+                                onboardingViewModel.updateSunriseEnabled(enabled)
+                                hasEnabledAlarms = enabled || onboardingState.sunsetEnabled
                                 if (
-                                    enabled &&
+                                    hasEnabledAlarms &&
                                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                                     !hasNotificationPermission(context)
                                 ) {
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
-                                requestExactAlarmPermission("notifications-toggle")
+                                requestExactAlarmPermission("sunrise-toggle")
                             },
-                            onSunriseEnabledChanged = onboardingViewModel::updateSunriseEnabled,
-                            onSunsetEnabledChanged = onboardingViewModel::updateSunsetEnabled,
+                            onSunsetEnabledChanged = { enabled ->
+                                onboardingViewModel.updateSunsetEnabled(enabled)
+                                hasEnabledAlarms = onboardingState.sunriseEnabled || enabled
+                                if (
+                                    hasEnabledAlarms &&
+                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                    !hasNotificationPermission(context)
+                                ) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                requestExactAlarmPermission("sunset-toggle")
+                            },
                             onSunriseOffsetChanged = onboardingViewModel::updateSunriseOffset,
                             onSunsetOffsetChanged = onboardingViewModel::updateSunsetOffset,
                             onCityQueryChanged = onboardingViewModel::updateCityQuery,

@@ -33,14 +33,13 @@ data class OnboardingState(
     val cityQuery: String = "",
     val cityResults: List<City> = emptyList(),
     val selectedCity: City? = null,
-    val notificationsEnabled: Boolean = true,
     val sunriseEnabled: Boolean = true,
     val sunriseOffsetMinutes: Int = 0,
     val sunsetEnabled: Boolean = false,
     val sunsetOffsetMinutes: Int = 0
 )
 
-enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, ALARMS, SUMMARY }
+enum class OnboardingStep { WELCOME, LOCATION, ALARMS, SUMMARY }
 
 enum class PermissionRequestOrigin { AUTOMATIC, USER }
 
@@ -69,7 +68,6 @@ class OnboardingViewModel(
             locationMode = settings.locationMode,
             fixedLatitude = settings.fixedLocation?.latitude?.toString() ?: "",
             fixedLongitude = settings.fixedLocation?.longitude?.toString() ?: "",
-            notificationsEnabled = sunriseEnabled || sunsetEnabled,
             sunriseEnabled = sunriseEnabled,
             sunriseOffsetMinutes = settings.sunriseConfig.offsetMinutes,
             sunsetEnabled = sunsetEnabled,
@@ -177,16 +175,6 @@ class OnboardingViewModel(
         )
     }
 
-    fun updateNotifications(enabled: Boolean) {
-        val updatedSunriseEnabled = if (enabled) _state.value.sunriseEnabled else false
-        val updatedSunsetEnabled = if (enabled) _state.value.sunsetEnabled else false
-        _state.value = _state.value.copy(
-            notificationsEnabled = enabled,
-            sunriseEnabled = updatedSunriseEnabled,
-            sunsetEnabled = updatedSunsetEnabled
-        )
-    }
-
     fun updateSunriseEnabled(enabled: Boolean) {
         _state.value = _state.value.copy(sunriseEnabled = enabled)
     }
@@ -230,7 +218,7 @@ class OnboardingViewModel(
                     type = SunEventType.SUNRISE,
                     offsetMinutes = onboardingState.sunriseOffsetMinutes,
                     label = existingAlarmsByType[SunEventType.SUNRISE]?.label ?: "Sunrise",
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled,
+                    enabled = onboardingState.sunriseEnabled,
                     recurrenceDays = ALL_DAYS_MASK,
                     vibrate = true
                 ),
@@ -241,7 +229,7 @@ class OnboardingViewModel(
                     type = SunEventType.SUNSET,
                     offsetMinutes = onboardingState.sunsetOffsetMinutes,
                     label = existingAlarmsByType[SunEventType.SUNSET]?.label ?: "Sunset",
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled,
+                    enabled = onboardingState.sunsetEnabled,
                     recurrenceDays = ALL_DAYS_MASK,
                     vibrate = true
                 )
@@ -249,12 +237,12 @@ class OnboardingViewModel(
             settings = settings.copy(
                 locationMode = if (_state.value.locationMode == LocationMode.FIXED) LocationMode.FIXED else LocationMode.DEVICE,
                 sunriseConfig = SunAlarmConfig(
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunriseEnabled,
+                    enabled = onboardingState.sunriseEnabled,
                     eventType = SunEventType.SUNRISE,
                     offsetMinutes = onboardingState.sunriseOffsetMinutes
                 ),
                 sunsetConfig = SunAlarmConfig(
-                    enabled = onboardingState.notificationsEnabled && onboardingState.sunsetEnabled,
+                    enabled = onboardingState.sunsetEnabled,
                     eventType = SunEventType.SUNSET,
                     offsetMinutes = onboardingState.sunsetOffsetMinutes
                 ),
