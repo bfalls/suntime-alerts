@@ -54,7 +54,6 @@ import com.bfalls.suntimealerts.cities.data.City
 fun OnboardingScreen(
     state: OnboardingState,
     onLocationModeChanged: (LocationMode) -> Unit,
-    onNotificationsChanged: (Boolean) -> Unit,
     onSunriseEnabledChanged: (Boolean) -> Unit,
     onSunsetEnabledChanged: (Boolean) -> Unit,
     onSunriseOffsetChanged: (Int) -> Unit,
@@ -108,7 +107,6 @@ fun OnboardingScreen(
                     text = when (state.step) {
                         OnboardingStep.WELCOME -> "Welcome"
                         OnboardingStep.LOCATION -> "Choose location"
-                        OnboardingStep.NOTIFICATIONS -> "Notifications"
                         OnboardingStep.ALARMS -> "Initial alarms"
                         OnboardingStep.SUMMARY -> "Summary"
                     },
@@ -124,7 +122,6 @@ fun OnboardingScreen(
                         onCityQueryChanged,
                         onCitySelected
                     )
-                    OnboardingStep.NOTIFICATIONS -> NotificationStep(state.notificationsEnabled, onNotificationsChanged)
                     OnboardingStep.ALARMS -> AlarmStep(state, onSunriseEnabledChanged, onSunsetEnabledChanged, onSunriseOffsetChanged, onSunsetOffsetChanged)
                     OnboardingStep.SUMMARY -> SummaryStep(state)
                 }
@@ -278,17 +275,6 @@ private fun LocationStep(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun NotificationStep(enabled: Boolean, onChanged: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text("Enable alerts")
-            Text("Turn on notifications to receive sunrise and sunset reminders.")
-        }
-        Switch(checked = enabled, onCheckedChange = onChanged)
     }
 }
 
