@@ -43,6 +43,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -111,6 +112,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.bfalls.suntimealerts.R
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
+import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
@@ -141,7 +143,10 @@ private fun Modifier.moonVisible(isVisible: Boolean): Modifier = semantics {
 }
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel) {
+fun HomeScreen(
+    viewModel: HomeViewModel,
+    onOpenSettings: () -> Unit
+) {
     val state by viewModel.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -162,7 +167,8 @@ fun HomeScreen(viewModel: HomeViewModel) {
         onToggleAlarmEnabled = viewModel::toggleAlarmEnabled,
         onDeleteAlarm = viewModel::deleteAlarm,
         onDuplicateAlarm = viewModel::duplicateAlarm,
-        onRestoreAlarm = viewModel::restoreAlarm
+        onRestoreAlarm = viewModel::restoreAlarm,
+        onOpenSettings = onOpenSettings
     )
 }
 
@@ -175,7 +181,8 @@ fun HomeScreenContent(
     onToggleAlarmEnabled: (String, Boolean) -> Unit,
     onDeleteAlarm: (String) -> Unit,
     onDuplicateAlarm: (SunAlarm) -> Unit,
-    onRestoreAlarm: (SunAlarm, Int) -> Unit
+    onRestoreAlarm: (SunAlarm, Int) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -226,7 +233,9 @@ fun HomeScreenContent(
                     moonIsWaxing = state.moonIsWaxing,
                     coordinateUsed = state.coordinateUsed,
                     sunTimesResolved = readyToRender,
-                    now = state.now
+                    now = state.now,
+                    skyBodySize = state.skyBodySize,
+                    onOpenSettings = onOpenSettings
                 )
             }
         },
@@ -870,7 +879,9 @@ private fun SkyTopBar(
     moonIsWaxing: Boolean,
     coordinateUsed: Coordinate?,
     sunTimesResolved: Boolean,
-    now: ZonedDateTime
+    now: ZonedDateTime,
+    skyBodySize: SkyBodySize,
+    onOpenSettings: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -888,6 +899,7 @@ private fun SkyTopBar(
             coordinateUsed = coordinateUsed,
             sunTimesResolved = sunTimesResolved,
             now = now,
+            skyBodySize = skyBodySize,
             modifier = Modifier
                 .matchParentSize()
                 .testTag("sky_appbar_background")
@@ -899,7 +911,12 @@ private fun SkyTopBar(
                 scrolledContainerColor = Color.Transparent,
                 titleContentColor = Color.White,
                 actionIconContentColor = Color.White
-            )
+            ),
+            actions = {
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                }
+            }
         )
     }
 }
@@ -916,6 +933,7 @@ private fun SkyAppBarBackground(
     coordinateUsed: Coordinate?,
     sunTimesResolved: Boolean,
     now: ZonedDateTime,
+    skyBodySize: SkyBodySize,
     modifier: Modifier = Modifier
 ) {
     val hasSunTimes = sunTimesResolved && sunrise != null && sunset != null
@@ -925,6 +943,11 @@ private fun SkyAppBarBackground(
     val sunImage: ImageBitmap = ImageBitmap.imageResource(id = R.drawable.sun)
     val placeholderTop = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
     val placeholderBottom = MaterialTheme.colorScheme.surfaceColorAtElevation(12.dp)
+    val bodyScale = when (skyBodySize) {
+        SkyBodySize.SMALL -> 1.0f
+        SkyBodySize.MEDIUM -> 1.25f
+        SkyBodySize.LARGE -> 1.5f
+    }
     Canvas(modifier = modifier.moonVisible(moonIsAboveHorizon)) {
         val dayLengthMinutes = if (sunrise != null && sunset != null) {
             Duration.between(sunrise, sunset).toMinutes()
@@ -1012,9 +1035,9 @@ private fun SkyAppBarBackground(
 
         val moonShouldDraw = moonWindowComplete && moonPosition.isUp
         if (moonShouldDraw) {
-            val moonBaseDiameter = size.minDimension * 0.10f
-            val minMoonSize = 20.dp.toPx()
-            val maxMoonSize = 36.dp.toPx()
+            val moonBaseDiameter = size.minDimension * 0.10f * bodyScale
+            val minMoonSize = 20.dp.toPx() * bodyScale
+            val maxMoonSize = 36.dp.toPx() * bodyScale
             val moonDiameter = moonBaseDiameter.coerceIn(minMoonSize, maxMoonSize)
             val moonRadius = moonDiameter / 2f
             val topLeft = Offset(moonPosition.x - moonRadius, moonPosition.y - moonRadius)
@@ -1064,9 +1087,9 @@ private fun SkyAppBarBackground(
         }
 
         if (isDay) {
-            val sunBaseDiameter = size.minDimension * 0.12f
-            val minSunSize = 24.dp.toPx()
-            val maxSunSize = 40.dp.toPx()
+            val sunBaseDiameter = size.minDimension * 0.12f * bodyScale
+            val minSunSize = 24.dp.toPx() * bodyScale
+            val maxSunSize = 40.dp.toPx() * bodyScale
             val sunDiameter = sunBaseDiameter.coerceIn(minSunSize, maxSunSize)
             val sunRadius = sunDiameter / 2f
             val topLeft = Offset(sunPosition.x - sunRadius, sunPosition.y - sunRadius)
