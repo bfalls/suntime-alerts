@@ -21,28 +21,41 @@ class AlarmOccurrenceCalculator(
         alarm: SunAlarm,
         coordinate: Coordinate,
         zoneId: ZoneId
-    ): Occurrence? {
+    ): Occurrence? = upcomingOccurrences(
+        alarm = alarm,
+        coordinate = coordinate,
+        zoneId = zoneId,
+        startDate = LocalDate.now(clock.withZone(zoneId)),
+        days = 7
+    ).firstOrNull()
+
+    fun upcomingOccurrences(
+        alarm: SunAlarm,
+        coordinate: Coordinate,
+        zoneId: ZoneId,
+        startDate: LocalDate,
+        days: Int
+    ): List<Occurrence> {
         val zonedClock = clock.withZone(zoneId)
         val nowMillis = Instant.now(zonedClock).toEpochMilli()
-        val startDate = LocalDate.now(zonedClock)
         val recurrenceMask = alarm.recurrenceDays ?: ALL_DAYS_MASK
 
-        for (daysFromNow in 0..6) {
-            val date = startDate.plusDays(daysFromNow.toLong())
-            if (!recurrenceMask.includesDay(date.dayOfWeek)) continue
+        return buildList {
+            for (daysFromNow in 0 until days) {
+                val date = startDate.plusDays(daysFromNow.toLong())
+                if (!recurrenceMask.includesDay(date.dayOfWeek)) continue
 
-            val sunTimes = calculator.calculateSunTimes(date, coordinate, zoneId)
-            val baseTime = when (alarm.type) {
-                SunEventType.SUNRISE -> sunTimes.sunrise
-                SunEventType.SUNSET -> sunTimes.sunset
-            } ?: continue
+                val sunTimes = calculator.calculateSunTimes(date, coordinate, zoneId)
+                val baseTime = when (alarm.type) {
+                    SunEventType.SUNRISE -> sunTimes.sunrise
+                    SunEventType.SUNSET -> sunTimes.sunset
+                } ?: continue
 
-            val triggerAtMillis = baseTime.toInstant().toEpochMilli() + alarm.offsetMinutes * 60 * 1000L
-            if (triggerAtMillis > nowMillis) {
-                return Occurrence(date, triggerAtMillis)
+                val triggerAtMillis = baseTime.toInstant().toEpochMilli() + alarm.offsetMinutes * 60 * 1000L
+                if (triggerAtMillis > nowMillis) {
+                    add(Occurrence(date, triggerAtMillis))
+                }
             }
         }
-
-        return null
     }
 }

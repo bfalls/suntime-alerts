@@ -91,5 +91,9 @@ class HomeViewModelTest {
         override suspend fun schedule(coordinate: Coordinate, zoneId: ZoneId) {
             receivedCoordinates += coordinate
         }
+
+        override suspend fun cancel(alarm: SunAlarm, zoneId: ZoneId) {
+            // no-op for tests
+        }
     }
 }

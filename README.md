@@ -38,4 +38,18 @@ Suntime Alerts is a dual-native mobile app (iOS + Android) that schedules alarms
 - Daily recomputation and rescheduling reacting to time zone, DST, and location changes.
 - Testable core logic with unit tests for solar calculations and scheduling offsets on both platforms.
 
+## Android: verifying alarm state via ADB
+Use these commands to confirm that the system AlarmManager state matches in-app alarm toggles:
+
+1. Clear app state (optional): `adb shell pm clear com.bfalls.suntimealerts`
+2. Inspect future alarms (should be empty after disabling/deleting all alarms):
+   ```bash
+   PKG=com.bfalls.suntimealerts
+   adb shell dumpsys alarm | grep "$PKG" | grep "OW=" | sed -n 's/.*OW=\([0-9-]* [0-9:]*\).*/\1 &/p' | awk -v now="$(adb shell date '+%Y-%m-%d %H:%M:%S')" '$1 " " $2 > now'
+   ```
+3. Trigger a manual reconcile if needed (debug-only broadcast):
+   ```bash
+   adb shell am broadcast -a com.bfalls.suntimealerts.DEBUG_RECONCILE_ALARMS
+   ```
+
 See [DESIGN.md](DESIGN.md) for detailed flows, algorithms, and extension notes.

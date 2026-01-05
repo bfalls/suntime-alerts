@@ -1,11 +1,13 @@
 package com.bfalls.suntimealerts.alarm.domain.model
 
 import java.time.DayOfWeek
-import java.util.UUID
 import kotlin.math.abs
 
+const val DEFAULT_SUNRISE_ALARM_ID = "sunrise"
+const val DEFAULT_SUNSET_ALARM_ID = "sunset"
+
 data class SunAlarm(
-    val id: String = UUID.randomUUID().toString(),
+    val id: String = java.util.UUID.randomUUID().toString(),
     val type: SunEventType,
     val offsetMinutes: Int,
     val label: String,

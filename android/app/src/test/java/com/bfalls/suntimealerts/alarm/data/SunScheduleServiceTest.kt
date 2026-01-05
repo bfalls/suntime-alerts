@@ -7,6 +7,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.domain.model.toBitMask
+import com.bfalls.suntimealerts.alarm.domain.service.AlarmOccurrenceCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.services.AlarmScheduler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,7 +45,7 @@ class SunScheduleServiceTest {
             override suspend fun loadAlarms(): List<SunAlarm> = alarms
             override suspend fun saveAlarms(alarms: List<SunAlarm>) = Unit
 
-            private val alarms = listOf(
+            val alarms = listOf(
                 SunAlarm(
                     type = SunEventType.SUNRISE,
                     offsetMinutes = 30,
@@ -58,11 +59,12 @@ class SunScheduleServiceTest {
 
         service.schedule(coordinate, zone)
 
-        val today = LocalDate.now(clock)
-        val sunTimes = calculator.calculateSunTimes(today, coordinate, zone)
-        val expectedTrigger = requireNotNull(sunTimes.sunrise).toInstant().toEpochMilli() + 30 * 60 * 1000L
+        assertTrue("Should schedule exactly one upcoming occurrence", notificationScheduler.entries.size == 1)
 
-        assertTrue("Only one occurrence should be scheduled per enabled alarm", notificationScheduler.entries.size == 1)
+        val expectedDate = LocalDate.now(clock)
+        val expectedTrigger = requireNotNull(
+            calculator.calculateSunTimes(expectedDate, coordinate, zone).sunrise
+        ).toInstant().toEpochMilli() + 30 * 60 * 1000L
 
         assertTrue(
             notificationScheduler.entries.any {
@@ -100,11 +102,8 @@ class SunScheduleServiceTest {
         service.schedule(coordinate, zone)
 
         val today = LocalDate.now(clock)
-        val tomorrow = today.plusDays(1)
-        val sunTimesTomorrow = calculator.calculateSunTimes(tomorrow, coordinate, zone)
-        val expectedTomorrowTrigger = requireNotNull(sunTimesTomorrow.sunrise).toInstant().toEpochMilli()
         assertTrue(
-            "Should only schedule a single upcoming occurrence",
+            "Should schedule exactly one upcoming occurrence",
             notificationScheduler.entries.size == 1
         )
         assertFalse(
@@ -115,7 +114,7 @@ class SunScheduleServiceTest {
         )
         assertTrue(
             "Should schedule tomorrow's occurrence",
-            notificationScheduler.entries.any { entry -> entry.triggerAtMillis == expectedTomorrowTrigger }
+            notificationScheduler.entries.single().date == today.plusDays(1)
         )
     }
 
@@ -148,9 +147,8 @@ class SunScheduleServiceTest {
         service.schedule(coordinate, zone)
 
         val today = LocalDate.now(clock)
-        val tomorrow = today.plusDays(1)
         assertTrue(
-            "Should only schedule one pending occurrence for the enabled alarm",
+            "Should only schedule one pending occurrence on the next selected day",
             notificationScheduler.entries.size == 1
         )
         assertFalse(
@@ -161,9 +159,7 @@ class SunScheduleServiceTest {
         )
         assertTrue(
             "Should schedule on the next selected day (tomorrow, Wednesday)",
-            notificationScheduler.entries.any { entry ->
-                Instant.ofEpochMilli(entry.triggerAtMillis).atZone(zone).toLocalDate() == tomorrow
-            }
+            notificationScheduler.entries.single().date == today.plusDays(1)
         )
     }
 
@@ -187,12 +183,23 @@ class SunScheduleServiceTest {
                 )
             )
         }
-        val service = SunScheduleService(calculator, repo, notificationScheduler)
-        val coordinate = Coordinate(0.0, 0.0)
+        val fixedInstant = Instant.parse("2024-01-01T00:00:00Z")
         val zone = ZoneId.of("UTC")
+        val clock = Clock.fixed(fixedInstant, zone)
+        val service = SunScheduleService(calculator, repo, notificationScheduler, clock)
+        val coordinate = Coordinate(0.0, 0.0)
 
         service.schedule(coordinate, zone)
         assertTrue(notificationScheduler.entries.isNotEmpty())
+
+        // Simulate a duplicate pending occurrence on the same date that should be removed.
+        val scheduledDate = notificationScheduler.entries.first().date
+        notificationScheduler.entries += RecordingNotificationScheduler.Entry(
+            alarmId = repo.alarms.first().id,
+            eventType = repo.alarms.first().type,
+            triggerAtMillis = Instant.now(clock).plusSeconds(24 * 3600).toEpochMilli(),
+            date = scheduledDate
+        )
 
         repo.alarms = repo.alarms.map { it.copy(enabled = false) }
         service.schedule(coordinate, zone)
@@ -200,11 +207,58 @@ class SunScheduleServiceTest {
         assertTrue(notificationScheduler.entries.isEmpty())
     }
 
+    @Test
+    fun reschedulesWhenEditMovesNextDate() = runTest {
+        val calculator = SunTimesCalculator()
+        val notificationScheduler = RecordingNotificationScheduler()
+        val repo = object : SettingsRepository {
+            override suspend fun load(): UserSettings = TODO("Not used")
+            override suspend fun save(settings: UserSettings) = Unit
+            override suspend fun loadAlarms(): List<SunAlarm> = alarms
+            override suspend fun saveAlarms(alarms: List<SunAlarm>) = Unit
+
+            var alarms: List<SunAlarm> = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Weekday edit",
+                    enabled = true,
+                    recurrenceDays = setOf(DayOfWeek.MONDAY).toBitMask()
+                )
+            )
+        }
+        val fixedInstant = Instant.parse("2024-01-01T00:00:00Z") // Monday
+        val zone = ZoneId.of("UTC")
+        val clock = Clock.fixed(fixedInstant, zone)
+        val service = SunScheduleService(calculator, repo, notificationScheduler, clock)
+        val coordinate = Coordinate(0.0, 0.0)
+
+        service.schedule(coordinate, zone)
+        assertTrue(notificationScheduler.entries.size == 1)
+        val originalDate = notificationScheduler.entries.single().date
+
+        // Change recurrence to Friday, which should move the next occurrence and cancel the original.
+        repo.alarms = repo.alarms.map {
+            it.copy(recurrenceDays = setOf(DayOfWeek.FRIDAY).toBitMask())
+        }
+        service.schedule(coordinate, zone)
+
+        assertTrue(
+            "Old occurrence should be canceled after edit",
+            notificationScheduler.entries.none { it.date == originalDate }
+        )
+        assertTrue(
+            "New occurrence should be scheduled on the edited recurrence day",
+            notificationScheduler.entries.single().date.dayOfWeek == DayOfWeek.FRIDAY
+        )
+    }
+
     private class RecordingNotificationScheduler : AlarmScheduler {
         data class Entry(
             val alarmId: String,
             val eventType: SunEventType,
-            val triggerAtMillis: Long
+            val triggerAtMillis: Long,
+            val date: LocalDate
         )
 
         val entries = mutableListOf<Entry>()
@@ -221,11 +275,23 @@ class SunScheduleServiceTest {
             vibrate: Boolean,
             coordinate: Coordinate
         ) {
-            entries += Entry(alarmId, eventType, triggerAtMillis)
+            entries += Entry(alarmId, eventType, triggerAtMillis, date)
         }
 
-        override fun cancelAll() {
-            entries.clear()
+        override fun hasScheduledOccurrence(alarmId: String, eventType: SunEventType, date: LocalDate): Boolean {
+            return entries.any { entry ->
+                entry.alarmId == alarmId &&
+                    entry.eventType == eventType &&
+                    entry.date == date
+            }
+        }
+
+        override fun cancelOccurrence(alarmId: String, eventType: SunEventType, date: LocalDate) {
+            entries.removeAll { entry ->
+                entry.alarmId == alarmId &&
+                    entry.eventType == eventType &&
+                    entry.date == date
+            }
         }
     }
 }

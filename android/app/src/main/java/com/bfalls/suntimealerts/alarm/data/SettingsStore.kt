@@ -11,6 +11,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
+import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNRISE_ALARM_ID
+import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNSET_ALARM_ID
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
@@ -20,7 +22,6 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import androidx.datastore.preferences.core.Preferences
 import kotlinx.coroutines.flow.first
-import java.util.UUID
 
 interface SettingsRepository {
     suspend fun load(): UserSettings
@@ -144,7 +145,7 @@ internal fun migrateLegacyAlarms(
     sunsetEnabled: Boolean
 ): List<SunAlarm> = listOf(
     SunAlarm(
-        id = UUID.randomUUID().toString(),
+        id = DEFAULT_SUNRISE_ALARM_ID,
         type = SunEventType.SUNRISE,
         offsetMinutes = sunriseOffset,
         label = "Sunrise",
@@ -153,7 +154,7 @@ internal fun migrateLegacyAlarms(
         vibrate = true
     ),
     SunAlarm(
-        id = UUID.randomUUID().toString(),
+        id = DEFAULT_SUNSET_ALARM_ID,
         type = SunEventType.SUNSET,
         offsetMinutes = sunsetOffset,
         label = "Sunset",
