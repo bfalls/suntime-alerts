@@ -13,7 +13,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -44,6 +46,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bfalls.suntimealerts.alarm.data.LocationService
 import com.bfalls.suntimealerts.alarm.data.SettingsStore
 import com.bfalls.suntimealerts.alarm.data.SunScheduleService
+import com.bfalls.suntimealerts.alarm.domain.model.AppThemeMode
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.presentation.ui.HomeScreen
@@ -60,23 +63,26 @@ import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
-import com.bfalls.suntimealerts.ui.theme.SplashBackground
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
-import com.bfalls.suntimealerts.ui.theme.TextPrimary
-import com.bfalls.suntimealerts.ui.theme.TextSecondary
 import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import com.bfalls.suntimealerts.utils.hasNotificationPermission
+import kotlinx.coroutines.runBlocking
 
 
 class MainActivity : ComponentActivity() {
+    private val settingsStore: SettingsStore by lazy { SettingsStore(applicationContext) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        runBlocking {
+            applyAppThemeMode(settingsStore.load().appThemeMode)
+        }
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
-            val settingsStore = remember { SettingsStore(applicationContext) }
+            val settingsStore = remember { this@MainActivity.settingsStore }
             val locationService = remember { LocationService(application) }
             val notificationScheduler = remember { NotificationScheduler(applicationContext) }
             val sunTimesCalculator = remember { SunTimesCalculator() }
@@ -89,6 +95,7 @@ class MainActivity : ComponentActivity() {
             val onboardingViewModel: OnboardingViewModel = viewModel(
                 factory = OnboardingViewModelFactory(settingsStore, cityRepository, locationService)
             )
+            val settingsState by settingsViewModel.state.collectAsState()
             val onboardingState by onboardingViewModel.state.collectAsState()
             val cityImportViewModel: CityImportViewModel = viewModel(
                 factory = CityImportViewModelFactory(cityRepository)
@@ -281,7 +288,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            SuntimeAlertsTheme {
+            val appThemeMode = settingsState.appThemeMode
+            val darkTheme = when (appThemeMode) {
+                AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
+
+            LaunchedEffect(appThemeMode) {
+                applyAppThemeMode(appThemeMode)
+            }
+
+            SuntimeAlertsTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -290,11 +308,14 @@ class MainActivity : ComponentActivity() {
                         cityImportState.isImporting -> Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(SplashBackground),
+                                .background(MaterialTheme.colorScheme.background),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(text = "Preparing Suntime Alerts...", color = TextPrimary)
+                                Text(
+                                    text = "Preparing Suntime Alerts...",
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 CircularProgressIndicator(
                                     progress = { cityImportState.progress }
@@ -303,7 +324,7 @@ class MainActivity : ComponentActivity() {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "${cityImportState.current} / ${cityImportState.total}",
-                                        color = TextSecondary
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -412,5 +433,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun applyAppThemeMode(mode: AppThemeMode) {
+        val nightMode = when (mode) {
+            AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+            AppThemeMode.DARK -> AppCompatDelegate.MODE_NIGHT_YES
+        }
+        AppCompatDelegate.setDefaultNightMode(nightMode)
     }
 }

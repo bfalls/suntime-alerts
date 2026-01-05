@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.bfalls.suntimealerts.alarm.data.LocationProvider
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
+import com.bfalls.suntimealerts.alarm.domain.model.AppThemeMode
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
@@ -24,6 +25,7 @@ data class SettingsUiState(
     val isLoading: Boolean = true,
     val locationState: LocationPickerUiState = LocationPickerUiState(),
     val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
+    val appThemeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val isSavingLocation: Boolean = false,
     val errorMessage: String? = null
 )
@@ -60,7 +62,8 @@ class SettingsViewModel(
                 cityQuery = settings.fixedLocation?.let { "" } ?: "",
                 selectedCity = null
             ),
-            skyBodySize = settings.skyBodySize
+            skyBodySize = settings.skyBodySize,
+            appThemeMode = settings.appThemeMode
         )
         if (settings.locationMode == LocationMode.DEVICE && !locationPermissionMissing) {
             refreshDeviceNearestCity()
@@ -184,6 +187,14 @@ class SettingsViewModel(
             settingsStore.save(settings)
             _state.update { current -> current.copy(skyBodySize = size) }
             onSaved()
+        }
+    }
+
+    fun updateAppThemeMode(mode: AppThemeMode) {
+        viewModelScope.launch {
+            val settings = settingsStore.load().copy(appThemeMode = mode)
+            settingsStore.save(settings)
+            _state.update { current -> current.copy(appThemeMode = mode) }
         }
     }
 

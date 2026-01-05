@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
+import com.bfalls.suntimealerts.alarm.domain.model.AppThemeMode
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.SettingsViewModel
 import com.bfalls.suntimealerts.utils.hasLocationPermission
@@ -234,6 +235,45 @@ fun SettingsScreen(
                             },
                             showAction = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !canScheduleExactAlarms
                         )
+                    }
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text("Theme", fontWeight = FontWeight.SemiBold)
+                        val themeOptions = listOf(
+                            AppThemeMode.SYSTEM to "System",
+                            AppThemeMode.LIGHT to "Light",
+                            AppThemeMode.DARK to "Dark"
+                        )
+                        themeOptions.forEach { (mode, label) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(
+                                        role = Role.RadioButton,
+                                        onClick = { viewModel.updateAppThemeMode(mode) }
+                                    )
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = state.appThemeMode == mode,
+                                    onClick = { viewModel.updateAppThemeMode(mode) }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(label)
+                            }
+                        }
                     }
                 }
 

@@ -16,6 +16,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNSET_ALARM_ID
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.alarm.domain.model.AppThemeMode
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.domain.model.withDefaults
@@ -42,6 +43,7 @@ class SettingsStore(private val context: Context) : SettingsRepository {
     private val onboarding = booleanPreferencesKey("onboarding")
     private val alarmsJson = stringPreferencesKey("alarms_json")
     private val skyBodySize = stringPreferencesKey("sky_body_size")
+    private val appThemeMode = stringPreferencesKey("app_theme_mode")
     private val gson = Gson()
 
     override suspend fun load(): UserSettings {
@@ -83,7 +85,10 @@ class SettingsStore(private val context: Context) : SettingsRepository {
             alarms = alarms,
             skyBodySize = prefs[skyBodySize]?.let { stored ->
                 runCatching { SkyBodySize.valueOf(stored) }.getOrDefault(SkyBodySize.SMALL)
-            } ?: SkyBodySize.SMALL
+            } ?: SkyBodySize.SMALL,
+            appThemeMode = prefs[appThemeMode]?.let { stored ->
+                runCatching { AppThemeMode.valueOf(stored) }.getOrDefault(AppThemeMode.SYSTEM)
+            } ?: AppThemeMode.SYSTEM
         )
     }
 
@@ -103,6 +108,7 @@ class SettingsStore(private val context: Context) : SettingsRepository {
             }
             prefs[alarmsJson] = gson.toJson(settings.alarms)
             prefs[skyBodySize] = settings.skyBodySize.name
+            prefs[appThemeMode] = settings.appThemeMode.name
         }
     }
 

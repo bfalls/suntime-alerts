@@ -3,14 +3,10 @@ package com.bfalls.suntimealerts.alarm.presentation.ui
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Paint
-import android.graphics.drawable.ColorDrawable
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.widget.EditText
-import android.widget.NumberPicker
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 //import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.material.icons.Icons
@@ -85,6 +82,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -96,10 +94,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
@@ -107,7 +107,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.bfalls.suntimealerts.R
@@ -126,6 +125,9 @@ import com.bfalls.suntimealerts.alarm.domain.service.SunXY
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -819,51 +821,123 @@ private fun OffsetPicker(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        NumberPickerColumn(
+        WheelPickerColumn(
             label = "Hours",
             value = hours,
             range = 0..23,
-            onValueChange = onHoursChanged
+            onValueChange = onHoursChanged,
+            modifier = Modifier.weight(1f)
         )
-        NumberPickerColumn(
+        WheelPickerColumn(
             label = "Minutes",
             value = minutes,
             range = 0..59,
-            onValueChange = onMinutesChanged
+            onValueChange = onMinutesChanged,
+            modifier = Modifier.weight(1f)
         )
     }
 }
 
 @Composable
-private fun NumberPickerColumn(
+private fun WheelPickerColumn(
     label: String,
     value: Int,
     range: IntRange,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
+    visibleCount: Int = 5,
+    modifier: Modifier = Modifier
 ) {
-    val pickerTextColor = MaterialTheme.colorScheme.onSurface
-    val pickerDividerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, fontWeight = FontWeight.Bold)
-        AndroidView(
-            factory = { context ->
-                NumberPicker(context).apply {
-                    minValue = range.first
-                    maxValue = range.last
-                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    setOnValueChangedListener { _, _, newVal -> onValueChange(newVal) }
-                    styleNumberPicker(this, pickerTextColor, pickerDividerColor)
+    val coercedVisible = visibleCount.coerceAtLeast(3).let { if (it % 2 == 0) it + 1 else it }
+    val halfCount = coercedVisible / 2
+    val itemHeight = 36.dp
+    val values = remember(range) { range.toList() }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = values.indexOf(value).coerceAtLeast(0))
+    val density = LocalDensity.current
+
+    LaunchedEffect(value, values) {
+        val targetIndex = values.indexOf(value).takeIf { it >= 0 } ?: return@LaunchedEffect
+        if (targetIndex != listState.firstVisibleItemIndex) {
+            listState.animateScrollToItem(targetIndex)
+        }
+    }
+
+    LaunchedEffect(listState, values) {
+        snapshotFlow { listState.isScrollInProgress }
+            .filter { !it }
+            .collectLatest {
+                val layoutInfo = listState.layoutInfo
+                val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
+                val centered = layoutInfo.visibleItemsInfo.minByOrNull { item ->
+                    kotlin.math.abs((item.offset + item.size / 2f) - viewportCenter)
+                } ?: return@collectLatest
+                val centeredValue = values.getOrNull(centered.index) ?: return@collectLatest
+                if (centeredValue != value) {
+                    onValueChange(centeredValue)
                 }
-            },
-            update = {
-                if (it.value != value) {
-                    it.value = value.coerceIn(range)
-                }
-                styleNumberPicker(it, pickerTextColor, pickerDividerColor)
             }
-        )
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .then(modifier)
+            .semantics { contentDescription = "$label picker, selected $value" }
+    ) {
+        Text(text = label, fontWeight = FontWeight.Bold)
+        Box(
+            modifier = Modifier
+                .height(itemHeight * coercedVisible)
+                .fillMaxWidth()
+        ) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(vertical = itemHeight * halfCount),
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                items(values) { entry ->
+                    val isSelected = entry == value
+                    val alpha = if (isSelected) 1f else 0.4f
+                    Box(
+                        modifier = Modifier
+                            .height(itemHeight)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = entry.toString(),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+            }
+            val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f)
+            val dividerStroke = with(density) { 1.dp.toPx() }
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 16.dp)
+                    .drawBehind {
+                        val centerY = size.height / 2f
+                        val halfHeightPx = with(density) { itemHeight.toPx() / 2f }
+                        drawLine(
+                            color = outlineColor,
+                            start = Offset(0f, centerY - halfHeightPx),
+                            end = Offset(size.width, centerY - halfHeightPx),
+                            strokeWidth = dividerStroke
+                        )
+                        drawLine(
+                            color = outlineColor,
+                            start = Offset(0f, centerY + halfHeightPx),
+                            end = Offset(size.width, centerY + halfHeightPx),
+                            strokeWidth = dividerStroke
+                        )
+                    }
+            )
+        }
     }
 }
 
@@ -1134,38 +1208,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStars(
     }
 }
 
-@SuppressLint("SoonBlockedPrivateApi")
-private fun styleNumberPicker(
-    numberPicker: NumberPicker,
-    textColor: Color,
-    dividerColor: Color
-) {
-    val textColorInt = textColor.toArgb()
-    for (index in 0 until numberPicker.childCount) {
-        val child = numberPicker.getChildAt(index)
-        if (child is EditText) {
-            child.setTextColor(textColorInt)
-        }
-    }
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-        try {
-            val selectorWheelPaintField = NumberPicker::class.java.getDeclaredField("mSelectorWheelPaint")
-            selectorWheelPaintField.isAccessible = true
-            val paint = selectorWheelPaintField.get(numberPicker) as Paint
-            paint.color = textColorInt
-        } catch (_: Exception) {
-            // Best-effort styling for OEM variations.
-        }
-        try {
-            val selectionDividerField = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
-            selectionDividerField.isAccessible = true
-            selectionDividerField.set(numberPicker, ColorDrawable(dividerColor.toArgb()))
-        } catch (_: Exception) {
-            // Ignore if the field is not available.
-        }
-    }
-    numberPicker.invalidate()
-}
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AlarmLists(
