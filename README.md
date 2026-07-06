@@ -29,8 +29,8 @@ Suntime Alerts is a dual-native mobile app (iOS + Android) that schedules alarms
 ### Android
 1. Open `android/` in Android Studio Giraffe+.
 2. Sync Gradle to download dependencies.
-3. Run the `app` configuration on an API 24+ emulator or device.
-4. If the Gradle wrapper JAR is missing (some CI environments omit it), regenerate with `./gradlew wrapper --gradle-version 8.2.1`.
+3. Run the `app` configuration on an API 26+ emulator or device.
+4. The Gradle wrapper JAR is checked in. If you need to regenerate it, use `./gradlew wrapper --gradle-version 8.13`.
 
 ## Development principles
 - Shared domain concepts: `SunEventType`, `SunEvent`, `SunAlarmConfig`, `UserSettings`.
