@@ -1,11 +1,9 @@
 package com.bfalls.suntimealerts
 
 import android.Manifest
-import android.app.AlarmManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -35,7 +33,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -59,14 +56,13 @@ import com.bfalls.suntimealerts.alarm.presentation.viewmodel.OnboardingViewModel
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.PermissionRequestOrigin
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.SettingsViewModel
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.SettingsViewModelFactory
+import com.bfalls.suntimealerts.alarm.services.AlarmReadinessService
+import com.bfalls.suntimealerts.alarm.services.AlarmRepairAction
 import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
-import com.bfalls.suntimealerts.utils.ExactAlarmPermissionTracker
-import com.bfalls.suntimealerts.utils.hasLocationPermission
-import com.bfalls.suntimealerts.utils.hasNotificationPermission
 import kotlinx.coroutines.runBlocking
 
 
@@ -81,19 +77,26 @@ class MainActivity : ComponentActivity() {
         }
         enableEdgeToEdge()
         setContent {
-            val context = LocalContext.current
             val settingsStore = remember { this@MainActivity.settingsStore }
             val locationService = remember { LocationService(application) }
             val notificationScheduler = remember { NotificationScheduler(applicationContext) }
             val sunTimesCalculator = remember { SunTimesCalculator() }
             val scheduleService = remember { SunScheduleService(sunTimesCalculator, settingsStore, notificationScheduler) }
             val cityRepository = remember { CityRepository(applicationContext) }
+            val alarmReadinessService = remember {
+                AlarmReadinessService(applicationContext, settingsStore)
+            }
             val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService, sunTimesCalculator) }
             val settingsViewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModelFactory(settingsStore, cityRepository, locationService, applicationContext)
             )
             val onboardingViewModel: OnboardingViewModel = viewModel(
-                factory = OnboardingViewModelFactory(settingsStore, cityRepository, locationService)
+                factory = OnboardingViewModelFactory(
+                    settingsStore,
+                    cityRepository,
+                    locationService,
+                    alarmReadinessService
+                )
             )
             val settingsState by settingsViewModel.state.collectAsState()
             val onboardingState by onboardingViewModel.state.collectAsState()
@@ -104,18 +107,19 @@ class MainActivity : ComponentActivity() {
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
-            var awaitingExactAlarmOnboardingResult by rememberSaveable { mutableStateOf(false) }
             var showSettings by rememberSaveable { mutableStateOf(false) }
-            val alarmManager = remember { getSystemService(ALARM_SERVICE) as AlarmManager }
-            val exactAlarmPermissionTracker = remember { ExactAlarmPermissionTracker(applicationContext) }
+            val openAppSettings = {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                }
+                startActivity(intent)
+            }
             val notificationPermissionLauncher =
                 rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
                 ) { granted ->
                     Log.d("MainActivity", "Notification permission result: granted=$granted")
-                    if (onboardingViewModel.state.value.step == OnboardingStep.NOTIFICATIONS) {
-                        onboardingViewModel.nextStep()
-                    }
+                    onboardingViewModel.handleNotificationPermissionResult()
                 }
             val lifecycleOwner = LocalLifecycleOwner.current
             val locationPermissionLauncher =
@@ -152,50 +156,13 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-            DisposableEffect(
-                lifecycleOwner,
-                onboardingState.locationPermissionPermanentlyDenied
-            ) {
-                val observer = LifecycleEventObserver { _, event ->
-                    if (
-                        event == Lifecycle.Event.ON_RESUME &&
-                        onboardingState.locationPermissionPermanentlyDenied &&
-                        hasLocationPermission(context)
-                    ) {
-                        onboardingViewModel.clearLocationPermissionDenial()
-                    }
-                }
-
-                lifecycleOwner.lifecycle.addObserver(observer)
-
-                onDispose {
-                    lifecycleOwner.lifecycle.removeObserver(observer)
-                }
-            }
-
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            val canSchedule = alarmManager.canScheduleExactAlarms()
-                            if (canSchedule) {
-                                exactAlarmPermissionTracker.reset()
-                            }
-                            if (pendingExactAlarmPermissionRequest) {
-                                if (!canSchedule) {
-                                    exactAlarmPermissionTracker.recordDenial()
-                                }
-                                pendingExactAlarmPermissionRequest = false
-                            }
-                            if (awaitingExactAlarmOnboardingResult) {
-                                if (canSchedule) {
-                                    onboardingViewModel.nextStep()
-                                }
-                                awaitingExactAlarmOnboardingResult = false
-                            }
-                        } else {
+                        onboardingViewModel.handleResume()
+                        if (pendingExactAlarmPermissionRequest) {
+                            onboardingViewModel.handleExactAlarmSettingsResult()
                             pendingExactAlarmPermissionRequest = false
-                            awaitingExactAlarmOnboardingResult = false
                         }
                     }
                 }
@@ -213,6 +180,7 @@ class MainActivity : ComponentActivity() {
                 onboardingState.locationMode,
                 onboardingState.deviceNearestCityLabel,
                 onboardingState.locationPermissionPermanentlyDenied,
+                onboardingState.alarmReadiness,
                 permissionRequestOrigin
             ) {
                 // If onboarding is showing the LOCATION step and is in DEVICE mode,
@@ -226,12 +194,10 @@ class MainActivity : ComponentActivity() {
                     permissionRequestOrigin == null &&
                     !onboardingState.locationPermissionPermanentlyDenied
                 ) {
-                    if (hasLocationPermission(context)) {
-                        // Permission already granted: trigger device-mode behavior
+                    if (onboardingState.alarmReadiness?.locationReady == true) {
                         onboardingViewModel.clearLocationPermissionDenial()
                         onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
                     } else {
-                        // Ask the system for permission
                         autoLocationPermissionRequested = true
                         permissionRequestOrigin = PermissionRequestOrigin.AUTOMATIC
                         locationPermissionLauncher.launch(
@@ -249,6 +215,7 @@ class MainActivity : ComponentActivity() {
                 onboardingState.onboardingComplete,
                 onboardingState.locationMode,
                 onboardingState.locationPermissionPermanentlyDenied,
+                onboardingState.alarmReadiness,
                 autoLocationPermissionRequested,
                 permissionRequestOrigin
             ) {
@@ -259,7 +226,7 @@ class MainActivity : ComponentActivity() {
                     !onboardingState.locationPermissionPermanentlyDenied &&
                     permissionRequestOrigin == null &&
                     !autoLocationPermissionRequested &&
-                    !hasLocationPermission(context)
+                    onboardingState.alarmReadiness?.locationReady != true
                 ) {
                     autoLocationPermissionRequested = true
                     permissionRequestOrigin = PermissionRequestOrigin.AUTOMATIC
@@ -338,13 +305,11 @@ class MainActivity : ComponentActivity() {
                                         LocationMode.DEVICE -> {
                                             onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
 
-                                            if (hasLocationPermission(context)) {
-                                                // Already granted → just switch to device mode
+                                            if (onboardingState.alarmReadiness?.locationReady == true) {
                                                 onboardingViewModel.clearLocationPermissionDenial()
                                                 return@OnboardingScreen
                                             }
 
-                                            // Trigger system permission dialog after the UI switches to device mode
                                             permissionRequestOrigin = PermissionRequestOrigin.USER
                                             locationPermissionLauncher.launch(
                                                 arrayOf(
@@ -358,55 +323,52 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 },
-                                onOpenPermissionSettings = {
-                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                        data = Uri.fromParts("package", packageName, null)
-                                    }
-                                    startActivity(intent)
-                                },
+                                onOpenPermissionSettings = openAppSettings,
                                 onCityQueryChanged = onboardingViewModel::updateCityQuery,
                                 onCitySelected = onboardingViewModel::selectCity,
-                                notificationsPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                    !hasNotificationPermission(context),
-                                exactAlarmPermissionRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                                    !alarmManager.canScheduleExactAlarms(),
+                                notificationsPermissionRequired = onboardingState.alarmReadiness?.notificationsReady == false,
+                                exactAlarmPermissionRequired = onboardingState.alarmReadiness?.exactAlarmReady == false,
                                 onNotificationsContinue = {
-                                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                    val readiness = onboardingState.alarmReadiness
+                                    if (readiness?.notificationsReady == true) {
                                         onboardingViewModel.nextStep()
                                         return@OnboardingScreen
                                     }
-                                    if (hasNotificationPermission(context)) {
-                                        onboardingViewModel.nextStep()
-                                    } else {
+                                    if (
+                                        readiness?.repairActions?.contains(
+                                            AlarmRepairAction.REQUEST_NOTIFICATION_PERMISSION
+                                        ) == true
+                                    ) {
                                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    } else if (
+                                        readiness?.repairActions?.contains(
+                                            AlarmRepairAction.OPEN_NOTIFICATION_SETTINGS
+                                        ) == true
+                                    ) {
+                                        openAppSettings()
                                     }
                                 },
                                 onNotificationsSkip = onboardingViewModel::nextStep,
                                 onExactAlarmsContinue = {
-                                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                                        onboardingViewModel.nextStep()
-                                        return@OnboardingScreen
-                                    }
-                                    if (alarmManager.canScheduleExactAlarms()) {
-                                        exactAlarmPermissionTracker.reset()
+                                    val readiness = onboardingState.alarmReadiness
+                                    if (readiness?.exactAlarmReady == true) {
                                         onboardingViewModel.nextStep()
                                         return@OnboardingScreen
                                     }
                                     if (pendingExactAlarmPermissionRequest) {
                                         return@OnboardingScreen
                                     }
-                                    pendingExactAlarmPermissionRequest = true
                                     if (
-                                        onboardingState.step == OnboardingStep.EXACT_ALARMS &&
-                                        !onboardingState.onboardingComplete
+                                        readiness?.repairActions?.contains(
+                                            AlarmRepairAction.REQUEST_EXACT_ALARM_PERMISSION
+                                        ) == true
                                     ) {
-                                        awaitingExactAlarmOnboardingResult = true
+                                        pendingExactAlarmPermissionRequest = true
+                                        startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                                     }
-                                    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                                 },
                                 onExactAlarmsSkip = {
                                     pendingExactAlarmPermissionRequest = false
-                                    awaitingExactAlarmOnboardingResult = false
                                     onboardingViewModel.nextStep()
                                 },
                                 onNext = onboardingViewModel::nextStep,

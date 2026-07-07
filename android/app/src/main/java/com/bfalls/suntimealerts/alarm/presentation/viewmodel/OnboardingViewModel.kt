@@ -8,8 +8,10 @@ import com.bfalls.suntimealerts.alarm.data.LocationProvider
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
+import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.cities.data.City
-import com.bfalls.suntimealerts.cities.data.CityRepository
+import com.bfalls.suntimealerts.cities.data.CityLookup
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +33,8 @@ data class OnboardingState(
     val sunriseEnabled: Boolean = false,
     val sunriseOffsetMinutes: Int = 0,
     val sunsetEnabled: Boolean = false,
-    val sunsetOffsetMinutes: Int = 0
+    val sunsetOffsetMinutes: Int = 0,
+    val alarmReadiness: AlarmReadiness? = null
 )
 
 enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, EXACT_ALARMS, SUMMARY }
@@ -40,8 +43,9 @@ enum class PermissionRequestOrigin { AUTOMATIC, USER }
 
 class OnboardingViewModel(
     private val settingsStore: SettingsRepository,
-    private val cityRepository: CityRepository,
-    private val locationService: LocationProvider
+    private val cityRepository: CityLookup,
+    private val locationService: LocationProvider,
+    private val alarmReadinessProvider: AlarmReadinessProvider
 ) : ViewModel() {
     private val _state = MutableStateFlow(OnboardingState())
     val state: StateFlow<OnboardingState> = _state
@@ -50,7 +54,10 @@ class OnboardingViewModel(
     private var nearestCityJob: Job? = null
 
     init {
-        viewModelScope.launch { load() }
+        viewModelScope.launch {
+            load()
+            refreshReadinessInternal()
+        }
     }
 
     private suspend fun load() {
@@ -82,6 +89,39 @@ class OnboardingViewModel(
         handleStepChanged()
     }
 
+    fun refreshReadiness() {
+        viewModelScope.launch {
+            refreshReadinessInternal()
+        }
+    }
+
+    fun handleResume() {
+        viewModelScope.launch {
+            val readiness = refreshReadinessInternal()
+            if (readiness.locationReady) {
+                clearLocationPermissionDenial()
+            }
+        }
+    }
+
+    fun handleNotificationPermissionResult() {
+        viewModelScope.launch {
+            val readiness = refreshReadinessInternal()
+            if (_state.value.step == OnboardingStep.NOTIFICATIONS && readiness.notificationsReady) {
+                nextStep()
+            }
+        }
+    }
+
+    fun handleExactAlarmSettingsResult() {
+        viewModelScope.launch {
+            val readiness = refreshReadinessInternal()
+            if (_state.value.step == OnboardingStep.EXACT_ALARMS && readiness.exactAlarmReady) {
+                nextStep()
+            }
+        }
+    }
+
     fun updateLocationMode(mode: LocationMode) {
         if (mode == LocationMode.DEVICE && _state.value.locationPermissionPermanentlyDenied) {
             // The user has exhausted permission attempts; keep them in manual mode until
@@ -111,6 +151,7 @@ class OnboardingViewModel(
                 locationPermissionPermanentlyDenied = false,
                 locationPermissionDeniedAttempts = 0
             )
+            refreshReadiness()
             updateLocationMode(LocationMode.DEVICE)
             return
         }
@@ -138,6 +179,7 @@ class OnboardingViewModel(
         ) {
             _state.value = updated.copy(locationMode = LocationMode.FIXED)
         }
+        refreshReadiness()
     }
 
     fun clearLocationPermissionDenial() {
@@ -145,6 +187,12 @@ class OnboardingViewModel(
         if (current.locationPermissionPermanentlyDenied) {
             _state.value = current.copy(locationPermissionPermanentlyDenied = false)
         }
+    }
+
+    private suspend fun refreshReadinessInternal(): AlarmReadiness {
+        val readiness = alarmReadinessProvider.readiness()
+        _state.value = _state.value.copy(alarmReadiness = readiness)
+        return readiness
     }
 
     fun updateCityQuery(query: String) {
@@ -277,13 +325,19 @@ private val orderedSteps = listOf(
 
 class OnboardingViewModelFactory(
     private val settingsStore: SettingsRepository,
-    private val cityRepository: CityRepository,
-    private val locationService: LocationProvider
+    private val cityRepository: CityLookup,
+    private val locationService: LocationProvider,
+    private val alarmReadinessProvider: AlarmReadinessProvider
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return OnboardingViewModel(settingsStore, cityRepository, locationService) as T
+            return OnboardingViewModel(
+                settingsStore,
+                cityRepository,
+                locationService,
+                alarmReadinessProvider
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

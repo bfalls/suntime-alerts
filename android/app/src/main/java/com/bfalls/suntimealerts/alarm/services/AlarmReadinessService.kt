@@ -130,8 +130,8 @@ class AlarmReadinessService(
     private val context: Context,
     private val settingsStore: SettingsRepository = SettingsStore(context),
     private val usesFullScreenAlarmUi: Boolean = false
-) {
-    suspend fun readiness(): AlarmReadiness {
+) : AlarmReadinessProvider {
+    override suspend fun readiness(): AlarmReadiness {
         return AlarmReadinessEvaluator.evaluate(inputs(settingsStore.load()))
     }
 
@@ -183,4 +183,8 @@ class AlarmReadinessService(
             Manifest.permission.USE_FULL_SCREEN_INTENT
         ) == PackageManager.PERMISSION_GRANTED
     }
+}
+
+interface AlarmReadinessProvider {
+    suspend fun readiness(): AlarmReadiness
 }
