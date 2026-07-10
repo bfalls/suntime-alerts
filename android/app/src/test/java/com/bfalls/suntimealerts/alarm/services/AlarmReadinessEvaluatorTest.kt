@@ -14,6 +14,7 @@ class AlarmReadinessEvaluatorTest {
         assertTrue(readiness.locationReady)
         assertTrue(readiness.notificationsReady)
         assertTrue(readiness.notificationChannelReady)
+        assertEquals(null, readiness.blockedNotificationChannelId)
         assertTrue(readiness.exactAlarmReady)
         assertTrue(readiness.fullScreenIntentReady)
         assertTrue(readiness.bootRescheduleReady)
@@ -124,6 +125,7 @@ class AlarmReadinessEvaluatorTest {
         )
 
         assertFalse(readiness.notificationChannelReady)
+        assertEquals("alarm_channel", readiness.blockedNotificationChannelId)
         assertEquals(
             listOf(AlarmReadinessIssue.NOTIFICATION_CHANNEL),
             readiness.missingCapabilities
@@ -209,6 +211,7 @@ class AlarmReadinessEvaluatorTest {
         runtimeNotificationPermissionGranted: Boolean = true,
         appNotificationsEnabled: Boolean = true,
         notificationChannelBlocked: Boolean = false,
+        blockedNotificationChannelId: String? = if (notificationChannelBlocked) "alarm_channel" else null,
         exactAlarmPermissionGranted: Boolean = true,
         usesFullScreenAlarmUi: Boolean = false,
         fullScreenIntentPermissionGranted: Boolean = true
@@ -221,6 +224,7 @@ class AlarmReadinessEvaluatorTest {
         runtimeNotificationPermissionGranted = runtimeNotificationPermissionGranted,
         appNotificationsEnabled = appNotificationsEnabled,
         notificationChannelBlocked = notificationChannelBlocked,
+        blockedNotificationChannelId = blockedNotificationChannelId,
         exactAlarmPermissionGranted = exactAlarmPermissionGranted,
         usesFullScreenAlarmUi = usesFullScreenAlarmUi,
         fullScreenIntentPermissionGranted = fullScreenIntentPermissionGranted

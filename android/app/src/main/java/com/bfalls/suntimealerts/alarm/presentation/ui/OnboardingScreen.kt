@@ -35,6 +35,8 @@ fun OnboardingScreen(
     state: OnboardingState,
     onLocationModeChanged: (LocationMode) -> Unit,
     onOpenPermissionSettings: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenNotificationChannelSettings: () -> Unit,
     onCityQueryChanged: (String) -> Unit,
     onCitySelected: (City) -> Unit,
     notificationsPermissionRequired: Boolean,
@@ -129,7 +131,9 @@ fun OnboardingScreen(
                     )
                     OnboardingStep.NOTIFICATIONS -> NotificationsStep(
                         state = state,
-                        permissionRequired = notificationsPermissionRequired
+                        permissionRequired = notificationsPermissionRequired,
+                        onOpenNotificationSettings = onOpenNotificationSettings,
+                        onOpenNotificationChannelSettings = onOpenNotificationChannelSettings
                     )
                     OnboardingStep.EXACT_ALARMS -> ExactAlarmsStep(
                         state = state,
@@ -197,7 +201,9 @@ private fun LocationStep(
 @Composable
 private fun NotificationsStep(
     state: OnboardingState,
-    permissionRequired: Boolean
+    permissionRequired: Boolean,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenNotificationChannelSettings: () -> Unit
 ) {
     val readiness = state.alarmReadiness
     val action = when {
@@ -221,6 +227,16 @@ private fun NotificationsStep(
         Text(
             "Suntime Alerts can send sunrise and sunset alerts. Android requires permission to post notifications. You can enable this now or skip and enable later in Settings."
         )
+        if (readiness?.repairActions?.contains(AlarmRepairAction.OPEN_NOTIFICATION_SETTINGS) == true) {
+            OutlinedButton(onClick = onOpenNotificationSettings) {
+                Text("Open notification settings")
+            }
+        }
+        if (readiness?.repairActions?.contains(AlarmRepairAction.OPEN_NOTIFICATION_CHANNEL_SETTINGS) == true) {
+            OutlinedButton(onClick = onOpenNotificationChannelSettings) {
+                Text("Open channel settings")
+            }
+        }
         if (!permissionRequired) {
             Text("Not required on this Android version or already allowed.")
         }

@@ -86,7 +86,15 @@ class MainActivity : ComponentActivity() {
             val alarmReadinessService = remember {
                 AlarmReadinessService(applicationContext, settingsStore)
             }
-            val homeViewModel = remember { HomeViewModel(locationService, settingsStore, scheduleService, sunTimesCalculator) }
+            val homeViewModel = remember {
+                HomeViewModel(
+                    locationService,
+                    settingsStore,
+                    scheduleService,
+                    sunTimesCalculator,
+                    alarmReadinessService
+                )
+            }
             val settingsViewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModelFactory(settingsStore, cityRepository, locationService, applicationContext)
             )
@@ -113,6 +121,23 @@ class MainActivity : ComponentActivity() {
                     data = Uri.fromParts("package", packageName, null)
                 }
                 startActivity(intent)
+            }
+            val openAppNotificationSettings = {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                }
+                startActivity(intent)
+            }
+            val openChannelNotificationSettings: (String?) -> Unit = { channelId ->
+                if (channelId.isNullOrBlank()) {
+                    openAppNotificationSettings()
+                } else {
+                    val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+                    }
+                    startActivity(intent)
+                }
             }
             val notificationPermissionLauncher =
                 rememberLauncherForActivityResult(
@@ -324,6 +349,12 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onOpenPermissionSettings = openAppSettings,
+                                onOpenNotificationSettings = openAppNotificationSettings,
+                                onOpenNotificationChannelSettings = {
+                                    openChannelNotificationSettings(
+                                        onboardingState.alarmReadiness?.blockedNotificationChannelId
+                                    )
+                                },
                                 onCityQueryChanged = onboardingViewModel::updateCityQuery,
                                 onCitySelected = onboardingViewModel::selectCity,
                                 notificationsPermissionRequired = onboardingState.alarmReadiness?.notificationsReady == false,
@@ -345,7 +376,15 @@ class MainActivity : ComponentActivity() {
                                             AlarmRepairAction.OPEN_NOTIFICATION_SETTINGS
                                         ) == true
                                     ) {
-                                        openAppSettings()
+                                        openAppNotificationSettings()
+                                    } else if (
+                                        readiness?.repairActions?.contains(
+                                            AlarmRepairAction.OPEN_NOTIFICATION_CHANNEL_SETTINGS
+                                        ) == true
+                                    ) {
+                                        openChannelNotificationSettings(
+                                            readiness.blockedNotificationChannelId
+                                        )
                                     }
                                 },
                                 onNotificationsSkip = onboardingViewModel::nextStep,
@@ -389,7 +428,11 @@ class MainActivity : ComponentActivity() {
                         )
                         else -> HomeScreen(
                             viewModel = homeViewModel,
-                            onOpenSettings = { showSettings = true }
+                            onOpenSettings = { showSettings = true },
+                            onOpenNotificationSettings = openAppNotificationSettings,
+                            onOpenNotificationChannelSettings = { channelId ->
+                                openChannelNotificationSettings(channelId)
+                            }
                         )
                     }
                 }

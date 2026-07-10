@@ -11,6 +11,8 @@ import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
+import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.alarm.domain.service.MoonEphemeris
 import com.bfalls.suntimealerts.alarm.domain.service.MoonTimesCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
@@ -30,7 +32,8 @@ class HomeViewModel(
     private val locationService: LocationProvider,
     private val settingsStore: SettingsRepository,
     private val scheduleService: SunScheduler,
-    private val sunTimesCalculator: SunTimesCalculator
+    private val sunTimesCalculator: SunTimesCalculator,
+    private val alarmReadinessProvider: AlarmReadinessProvider
 ) : ViewModel() {
 
     private val fallbackSunTimes = sunTimesCalculator.calculateSunTimes(
@@ -56,6 +59,7 @@ class HomeViewModel(
         val moonIsWaxing: Boolean = true,
         val now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault()),
         val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
+        val alarmReadiness: AlarmReadiness? = null,
         val error: String? = null
     )
 
@@ -177,6 +181,8 @@ class HomeViewModel(
             if (settings.alarms.isEmpty()) {
                 settingsStore.saveAlarms(alarms)
             }
+            val readiness = alarmReadinessProvider.readiness()
+            _state.update { current -> current.copy(alarmReadiness = readiness) }
 
             refreshAstronomyState(settings = settings, alarms = alarms, placeholderSunTimes = placeholderSunTimes)
 
@@ -201,9 +207,11 @@ class HomeViewModel(
     private suspend fun persistAlarms(alarms: List<SunAlarm>) {
         settingsStore.saveAlarms(alarms)
         cachedSettings = (cachedSettings ?: settingsStore.load()).copy(alarms = alarms)
+        val readiness = alarmReadinessProvider.readiness()
         _state.value = _state.value.copy(
             sunriseAlarms = alarms.filter { it.type == SunEventType.SUNRISE }.sortedBy { it.offsetMinutes },
-            sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes }
+            sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes },
+            alarmReadiness = readiness
         )
         scheduleForCurrentSettings()
     }

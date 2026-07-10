@@ -118,6 +118,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.model.includesDay
 import com.bfalls.suntimealerts.alarm.domain.model.toBitMask
+import com.bfalls.suntimealerts.alarm.services.AlarmRepairAction
 import com.bfalls.suntimealerts.alarm.domain.service.MoonArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.MoonXY
 import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
@@ -148,7 +149,9 @@ private fun Modifier.moonVisible(isVisible: Boolean): Modifier = semantics {
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenNotificationChannelSettings: (String?) -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -171,7 +174,9 @@ fun HomeScreen(
         onDeleteAlarm = viewModel::deleteAlarm,
         onDuplicateAlarm = viewModel::duplicateAlarm,
         onRestoreAlarm = viewModel::restoreAlarm,
-        onOpenSettings = onOpenSettings
+        onOpenSettings = onOpenSettings,
+        onOpenNotificationSettings = onOpenNotificationSettings,
+        onOpenNotificationChannelSettings = onOpenNotificationChannelSettings
     )
 }
 
@@ -185,7 +190,9 @@ fun HomeScreenContent(
     onDeleteAlarm: (String) -> Unit,
     onDuplicateAlarm: (SunAlarm) -> Unit,
     onRestoreAlarm: (SunAlarm, Int) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenNotificationChannelSettings: (String?) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -269,6 +276,13 @@ fun HomeScreenContent(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
+                    item {
+                        NotificationReadinessBanner(
+                            state = state,
+                            onOpenNotificationSettings = onOpenNotificationSettings,
+                            onOpenNotificationChannelSettings = onOpenNotificationChannelSettings
+                        )
+                    }
                     stickyHeader {
                         AlarmSectionHeader(title = "Sunrise", time = state.sunriseTime)
                     }
@@ -342,6 +356,60 @@ fun HomeScreenContent(
                 showSheet = false
             }
         )
+    }
+}
+
+@Composable
+private fun NotificationReadinessBanner(
+    state: HomeViewModel.State,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenNotificationChannelSettings: (String?) -> Unit
+) {
+    val readiness = state.alarmReadiness ?: return
+    val needsNotificationRepair =
+        !readiness.notificationsReady || !readiness.notificationChannelReady
+    if (!needsNotificationRepair) return
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Alerts need notification access",
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = when {
+                    !readiness.notificationsReady ->
+                        "Android is blocking app notifications, so sunrise and sunset alerts cannot fire."
+                    else ->
+                        "An alarm notification channel is blocked, so some alerts cannot fire."
+                },
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (readiness.repairActions.contains(AlarmRepairAction.OPEN_NOTIFICATION_SETTINGS)) {
+                    Button(onClick = onOpenNotificationSettings) {
+                        Text("App settings")
+                    }
+                }
+                if (readiness.repairActions.contains(AlarmRepairAction.OPEN_NOTIFICATION_CHANNEL_SETTINGS)) {
+                    Button(onClick = {
+                        onOpenNotificationChannelSettings(readiness.blockedNotificationChannelId)
+                    }) {
+                        Text("Channel settings")
+                    }
+                }
+            }
+        }
     }
 }
 

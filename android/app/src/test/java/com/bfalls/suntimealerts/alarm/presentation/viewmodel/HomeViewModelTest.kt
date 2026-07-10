@@ -10,6 +10,8 @@ import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
+import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
+import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -48,7 +50,13 @@ class HomeViewModelTest {
         val locationProvider = RecordingLocationProvider()
         val scheduler = RecordingScheduler()
 
-        val viewModel = HomeViewModel(locationProvider, settingsRepo, scheduler, SunTimesCalculator())
+        val viewModel = HomeViewModel(
+            locationProvider,
+            settingsRepo,
+            scheduler,
+            SunTimesCalculator(),
+            FakeAlarmReadinessProvider()
+        )
 
         advanceUntilIdle()
         viewModel.reschedule()
@@ -95,5 +103,20 @@ class HomeViewModelTest {
         override suspend fun cancel(alarm: SunAlarm, zoneId: ZoneId) {
             // no-op for tests
         }
+    }
+
+    private class FakeAlarmReadinessProvider : AlarmReadinessProvider {
+        override suspend fun readiness(): AlarmReadiness = AlarmReadiness(
+            locationReady = true,
+            notificationsReady = true,
+            notificationChannelReady = true,
+            blockedNotificationChannelId = null,
+            exactAlarmReady = true,
+            fullScreenIntentReady = true,
+            bootRescheduleReady = true,
+            canDeliverReliableAlerts = true,
+            missingCapabilities = emptyList(),
+            repairActions = emptyList()
+        )
     }
 }

@@ -38,6 +38,7 @@ data class AlarmReadiness(
     val locationReady: Boolean,
     val notificationsReady: Boolean,
     val notificationChannelReady: Boolean,
+    val blockedNotificationChannelId: String?,
     val exactAlarmReady: Boolean,
     val fullScreenIntentReady: Boolean,
     val bootRescheduleReady: Boolean,
@@ -55,6 +56,7 @@ data class AlarmReadinessInputs(
     val runtimeNotificationPermissionGranted: Boolean,
     val appNotificationsEnabled: Boolean,
     val notificationChannelBlocked: Boolean,
+    val blockedNotificationChannelId: String?,
     val exactAlarmPermissionGranted: Boolean,
     val usesFullScreenAlarmUi: Boolean,
     val fullScreenIntentPermissionGranted: Boolean
@@ -118,6 +120,7 @@ object AlarmReadinessEvaluator {
             locationReady = locationReady,
             notificationsReady = notificationsReady,
             notificationChannelReady = notificationChannelReady,
+            blockedNotificationChannelId = inputs.blockedNotificationChannelId,
             exactAlarmReady = exactAlarmReady,
             fullScreenIntentReady = fullScreenIntentReady,
             bootRescheduleReady = bootRescheduleReady,
@@ -146,7 +149,8 @@ class AlarmReadinessService(
             lastResolvedDeviceLocationAvailable = settings.lastResolvedDeviceLocation != null,
             runtimeNotificationPermissionGranted = hasNotificationPermission(context),
             appNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
-            notificationChannelBlocked = hasBlockedAlarmNotificationChannel(settings),
+            notificationChannelBlocked = blockedAlarmNotificationChannel(settings) != null,
+            blockedNotificationChannelId = blockedAlarmNotificationChannel(settings),
             exactAlarmPermissionGranted = canScheduleExactAlarms(),
             usesFullScreenAlarmUi = usesFullScreenAlarmUi,
             fullScreenIntentPermissionGranted = canUseFullScreenIntent()
@@ -159,18 +163,27 @@ class AlarmReadinessService(
         return alarmManager.canScheduleExactAlarms()
     }
 
-    private fun hasBlockedAlarmNotificationChannel(settings: UserSettings): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+    private fun blockedAlarmNotificationChannel(settings: UserSettings): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        return settings.alarms
+        settings.alarms
             .filter { it.enabled }
-            .mapNotNull { alarm ->
-                notificationManager.getNotificationChannel(
-                    SunEventReceiver.channelIdForAlarm(alarm.id)
+            .forEach { alarm ->
+                SunEventReceiver.ensureChannelExists(
+                    context = context,
+                    alarmId = alarm.id,
+                    soundUri = alarm.soundUri,
+                    vibrate = alarm.vibrate ?: true
                 )
             }
-            .any { channel -> channel.importance == NotificationManager.IMPORTANCE_NONE }
+        return settings.alarms
+            .filter { it.enabled }
+            .map { alarm -> SunEventReceiver.channelIdForAlarm(alarm.id) }
+            .firstOrNull { channelId ->
+                notificationManager.getNotificationChannel(channelId)?.importance ==
+                    NotificationManager.IMPORTANCE_NONE
+            }
     }
 
     private fun canUseFullScreenIntent(): Boolean {

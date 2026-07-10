@@ -281,6 +281,7 @@ class OnboardingViewModelTest {
             locationReady = locationReady,
             notificationsReady = notificationsReady,
             notificationChannelReady = notificationChannelReady,
+            blockedNotificationChannelId = if (notificationChannelReady) null else "alarm_channel",
             exactAlarmReady = exactAlarmReady,
             fullScreenIntentReady = fullScreenIntentReady,
             bootRescheduleReady = bootRescheduleReady,
