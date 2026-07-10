@@ -40,6 +40,8 @@ class SettingsStore(private val context: Context) : SettingsRepository {
     private val time24h = booleanPreferencesKey("time_24h")
     private val fixedLat = doublePreferencesKey("fixed_lat")
     private val fixedLon = doublePreferencesKey("fixed_lon")
+    private val deviceLat = doublePreferencesKey("device_lat")
+    private val deviceLon = doublePreferencesKey("device_lon")
     private val onboarding = booleanPreferencesKey("onboarding")
     private val alarmsJson = stringPreferencesKey("alarms_json")
     private val skyBodySize = stringPreferencesKey("sky_body_size")
@@ -75,9 +77,19 @@ class SettingsStore(private val context: Context) : SettingsRepository {
             prefs[fixedLat] ?: 0.0,
             prefs[fixedLon] ?: 0.0
         ) else null
+        val lastResolvedDeviceLocation =
+            if (prefs[deviceLat] != null && prefs[deviceLon] != null) {
+                Coordinate(
+                    prefs[deviceLat] ?: 0.0,
+                    prefs[deviceLon] ?: 0.0
+                )
+            } else {
+                null
+            }
         return UserSettings(
             locationMode = locationMode,
             fixedLocation = fixed,
+            lastResolvedDeviceLocation = lastResolvedDeviceLocation,
             sunriseConfig = sunriseConfig,
             sunsetConfig = sunsetConfig,
             timeFormat24h = prefs[time24h] ?: true,
@@ -105,6 +117,14 @@ class SettingsStore(private val context: Context) : SettingsRepository {
             } else {
                 prefs.remove(fixedLat)
                 prefs.remove(fixedLon)
+            }
+            val deviceLocation = settings.lastResolvedDeviceLocation
+            if (deviceLocation != null) {
+                prefs[deviceLat] = deviceLocation.latitude
+                prefs[deviceLon] = deviceLocation.longitude
+            } else {
+                prefs.remove(deviceLat)
+                prefs.remove(deviceLon)
             }
             prefs[alarmsJson] = gson.toJson(settings.alarms)
             prefs[skyBodySize] = settings.skyBodySize.name

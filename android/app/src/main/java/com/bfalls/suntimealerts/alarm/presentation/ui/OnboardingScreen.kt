@@ -178,6 +178,7 @@ private fun LocationStep(
                 locationMode = state.locationMode,
                 locationPermissionPermanentlyDenied = state.locationPermissionPermanentlyDenied,
                 locationPermissionMissing = state.locationPermissionPermanentlyDenied,
+                deviceLocationLookupFailed = state.deviceLocationLookupFailed,
                 deviceNearestCityLabel = state.deviceNearestCityLabel,
                 fixedLatitude = state.fixedLatitude,
                 fixedLongitude = state.fixedLongitude,

@@ -19,6 +19,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -96,6 +99,108 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun handleLocationPermissionResultTreatsCoarseOnlyGrantAsUsable() = runTest {
+        val readinessProvider = FakeAlarmReadinessProvider(readiness(locationReady = true))
+        val locationProvider = FakeLocationProvider(Coordinate(39.7392, -104.9903))
+        val cityLookup = FakeCityLookup(
+            nearestCity = sampleCity()
+        )
+        val viewModel = createViewModel(
+            readinessProvider = readinessProvider,
+            cityRepository = cityLookup,
+            locationService = locationProvider
+        )
+        advanceUntilIdle()
+
+        viewModel.handleLocationPermissionResult(
+            granted = true,
+            permanentlyDenied = false,
+            origin = PermissionRequestOrigin.USER
+        )
+        advanceUntilIdle()
+
+        assertEquals(LocationMode.DEVICE, viewModel.state.value.locationMode)
+        assertEquals("Denver, CO, US", viewModel.state.value.deviceNearestCityLabel)
+        assertFalse(viewModel.state.value.deviceLocationLookupFailed)
+    }
+
+    @Test
+    fun handleLocationPermissionResultTreatsFineGrantAsUsable() = runTest {
+        val readinessProvider = FakeAlarmReadinessProvider(readiness(locationReady = true))
+        val locationProvider = FakeLocationProvider(Coordinate(39.7392, -104.9903))
+        val cityLookup = FakeCityLookup(
+            nearestCity = sampleCity()
+        )
+        val viewModel = createViewModel(
+            readinessProvider = readinessProvider,
+            cityRepository = cityLookup,
+            locationService = locationProvider
+        )
+        advanceUntilIdle()
+
+        viewModel.handleLocationPermissionResult(
+            granted = true,
+            permanentlyDenied = false,
+            origin = PermissionRequestOrigin.USER
+        )
+        advanceUntilIdle()
+
+        assertEquals(LocationMode.DEVICE, viewModel.state.value.locationMode)
+        assertEquals("Denver, CO, US", viewModel.state.value.deviceNearestCityLabel)
+        assertFalse(viewModel.state.value.deviceLocationLookupFailed)
+    }
+
+    @Test
+    fun handleLocationPermissionResultFallsBackToManualWhenDenied() = runTest {
+        val viewModel = createViewModel(FakeAlarmReadinessProvider(readiness(locationReady = false)))
+        advanceUntilIdle()
+
+        viewModel.handleLocationPermissionResult(
+            granted = false,
+            permanentlyDenied = true,
+            origin = PermissionRequestOrigin.USER
+        )
+        advanceUntilIdle()
+
+        assertEquals(LocationMode.FIXED, viewModel.state.value.locationMode)
+        assertTrue(viewModel.state.value.locationPermissionPermanentlyDenied)
+    }
+
+    @Test
+    fun deviceModeShowsManualFallbackWhenLocationLookupFails() = runTest {
+        val viewModel = createViewModel(
+            readinessProvider = FakeAlarmReadinessProvider(readiness(locationReady = true)),
+            locationService = FakeLocationProvider(null)
+        )
+        advanceUntilIdle()
+
+        viewModel.updateLocationMode(LocationMode.DEVICE)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.deviceLocationLookupFailed)
+        assertEquals(null, viewModel.state.value.deviceNearestCityLabel)
+    }
+
+    @Test
+    fun selectCityPersistsManualFallbackImmediately() = runTest {
+        val settingsStore = FakeSettingsRepository()
+        val city = sampleCity()
+        val viewModel = createViewModel(
+            readinessProvider = FakeAlarmReadinessProvider(readiness(locationReady = false)),
+            settingsStore = settingsStore
+        )
+        advanceUntilIdle()
+
+        viewModel.selectCity(city)
+        advanceUntilIdle()
+
+        assertEquals(LocationMode.FIXED, settingsStore.settings.locationMode)
+        assertNotNull(settingsStore.settings.fixedLocation)
+        assertEquals(city.lat, settingsStore.settings.fixedLocation?.latitude ?: 0.0, 0.0)
+        assertEquals(city.lon, settingsStore.settings.fixedLocation?.longitude ?: 0.0, 0.0)
+    }
+
+    @Test
     fun completeDoesNotFinishWhenRequiredReadinessIsMissing() = runTest {
         val readinessProvider = FakeAlarmReadinessProvider(
             readiness(exactAlarmReady = false)
@@ -126,12 +231,27 @@ class OnboardingViewModelTest {
     }
 
     private fun createViewModel(
-        readinessProvider: FakeAlarmReadinessProvider
+        readinessProvider: FakeAlarmReadinessProvider,
+        settingsStore: FakeSettingsRepository = FakeSettingsRepository(),
+        cityRepository: FakeCityLookup = FakeCityLookup(),
+        locationService: FakeLocationProvider = FakeLocationProvider()
     ): OnboardingViewModel = OnboardingViewModel(
-        settingsStore = FakeSettingsRepository(),
-        cityRepository = FakeCityLookup(),
-        locationService = FakeLocationProvider(),
+        settingsStore = settingsStore,
+        cityRepository = cityRepository,
+        locationService = locationService,
         alarmReadinessProvider = readinessProvider
+    )
+
+    private fun sampleCity(): City = City(
+        id = 1L,
+        name = "Denver",
+        asciiName = "Denver",
+        countryCode = "US",
+        admin1Code = "CO",
+        lat = 39.7392,
+        lon = -104.9903,
+        timezone = "America/Denver",
+        population = 700000
     )
 
     private fun readiness(
@@ -178,7 +298,7 @@ class OnboardingViewModelTest {
 
     private class FakeSettingsRepository : SettingsRepository {
         private val fixedCoordinate = Coordinate(39.7392, -104.9903)
-        private var settings = UserSettings(
+        var settings = UserSettings(
             locationMode = LocationMode.FIXED,
             fixedLocation = fixedCoordinate,
             sunriseConfig = SunAlarmConfig(false, SunEventType.SUNRISE, 0),
@@ -201,12 +321,16 @@ class OnboardingViewModelTest {
         }
     }
 
-    private class FakeCityLookup : CityLookup {
+    private class FakeCityLookup(
+        private val nearestCity: City? = null
+    ) : CityLookup {
         override suspend fun searchCities(query: String, limit: Int): List<City> = emptyList()
-        override suspend fun findNearestCity(lat: Double, lon: Double): City? = null
+        override suspend fun findNearestCity(lat: Double, lon: Double): City? = nearestCity
     }
 
-    private class FakeLocationProvider : LocationProvider {
-        override suspend fun currentCoordinate(): Coordinate? = null
+    private class FakeLocationProvider(
+        private val coordinate: Coordinate? = null
+    ) : LocationProvider {
+        override suspend fun currentCoordinate(): Coordinate? = coordinate
     }
 }

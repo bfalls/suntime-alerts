@@ -12,6 +12,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.tasks.await
 
 interface LocationProvider {
@@ -48,13 +49,20 @@ class LocationService(private val application: Application) : LocationProvider {
             Log.d("LocationService", "Requesting current location…")
 
             val cts = CancellationTokenSource()
+            val priority = if (fineGranted) {
+                Priority.PRIORITY_HIGH_ACCURACY
+            } else {
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY
+            }
 
             // Try a fresh fix first
             val current: Location? = try {
-                client.getCurrentLocation(
-                    Priority.PRIORITY_HIGH_ACCURACY,
-                    cts.token
-                ).await()
+                withTimeoutOrNull(10_000) {
+                    client.getCurrentLocation(
+                        priority,
+                        cts.token
+                    ).await()
+                }
             } catch (t: Throwable) {
                 Log.w("LocationService", "getCurrentLocation failed: $t")
                 null
@@ -63,7 +71,9 @@ class LocationService(private val application: Application) : LocationProvider {
             Log.d("LocationService", "getCurrentLocation result = $current")
 
             val last: Location? = if (current == null) {
-                val lastLoc = client.lastLocation.await()
+                val lastLoc = withTimeoutOrNull(2_000) {
+                    client.lastLocation.await()
+                }
                 Log.d("LocationService", "lastLocation result = $lastLoc")
                 lastLoc
             } else {

@@ -1,6 +1,5 @@
 package com.bfalls.suntimealerts.alarm.presentation.viewmodel
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,6 +24,7 @@ data class OnboardingState(
     val locationPermissionPermanentlyDenied: Boolean = false,
     val locationPermissionDeniedAttempts: Int = 0,
     val deviceNearestCityLabel: String? = null,
+    val deviceLocationLookupFailed: Boolean = false,
     val fixedLatitude: String = "",
     val fixedLongitude: String = "",
     val cityQuery: String = "",
@@ -68,6 +68,10 @@ class OnboardingViewModel(
             isLoaded = true,
             onboardingComplete = settings.onboardingComplete,
             locationMode = settings.locationMode,
+            deviceNearestCityLabel = settings.lastResolvedDeviceLocation?.let { coordinate ->
+                cityRepository.findNearestCity(coordinate.latitude, coordinate.longitude)
+                    ?.let(::formatNearestCityLabel)
+            },
             fixedLatitude = settings.fixedLocation?.latitude?.toString() ?: "",
             fixedLongitude = settings.fixedLocation?.longitude?.toString() ?: "",
             sunriseEnabled = sunriseEnabled,
@@ -132,7 +136,12 @@ class OnboardingViewModel(
 
         _state.value = _state.value.copy(
             locationMode = mode,
-            deviceNearestCityLabel = if (mode == LocationMode.DEVICE) null else _state.value.deviceNearestCityLabel
+            deviceNearestCityLabel = if (mode == LocationMode.DEVICE) {
+                _state.value.deviceNearestCityLabel
+            } else {
+                _state.value.deviceNearestCityLabel
+            },
+            deviceLocationLookupFailed = false
         )
         if (mode == LocationMode.DEVICE) {
             refreshDeviceNearestCity()
@@ -149,7 +158,8 @@ class OnboardingViewModel(
         if (granted) {
             _state.value = current.copy(
                 locationPermissionPermanentlyDenied = false,
-                locationPermissionDeniedAttempts = 0
+                locationPermissionDeniedAttempts = 0,
+                deviceLocationLookupFailed = false
             )
             refreshReadiness()
             updateLocationMode(LocationMode.DEVICE)
@@ -161,7 +171,8 @@ class OnboardingViewModel(
 
         val updated = current.copy(
             locationPermissionPermanentlyDenied = forcedManual,
-            locationPermissionDeniedAttempts = updatedAttempts
+            locationPermissionDeniedAttempts = updatedAttempts,
+            deviceLocationLookupFailed = false
         )
         _state.value = updated
 
@@ -216,6 +227,17 @@ class OnboardingViewModel(
             fixedLatitude = city.lat.toString(),
             fixedLongitude = city.lon.toString()
         )
+        viewModelScope.launch {
+            val settings = settingsStore.load().copy(
+                locationMode = LocationMode.FIXED,
+                fixedLocation = com.bfalls.suntimealerts.alarm.domain.model.Coordinate(
+                    city.lat,
+                    city.lon
+                )
+            )
+            settingsStore.save(settings)
+            refreshReadinessInternal()
+        }
     }
 
     fun updateSunriseEnabled(enabled: Boolean) {
@@ -298,26 +320,36 @@ class OnboardingViewModel(
     private fun refreshDeviceNearestCity() {
         nearestCityJob?.cancel()
         nearestCityJob = viewModelScope.launch {
-            _state.value = _state.value.copy(deviceNearestCityLabel = null)
-            Log.d("OnboardingViewModel", "Requesting device location for nearest city")
+            _state.value = _state.value.copy(
+                deviceNearestCityLabel = null,
+                deviceLocationLookupFailed = false
+            )
+            debugLog("Requesting device location for nearest city")
 
             val coordinate = locationService.currentCoordinate() ?: run {
-                Log.w(
-                    "OnboardingViewModel",
-                    "Device coordinate unavailable; cannot compute nearest city"
-                )
+                warnLog("Device coordinate unavailable; cannot compute nearest city")
+                _state.value = _state.value.copy(deviceLocationLookupFailed = true)
                 return@launch
             }
 
-            Log.d("OnboardingViewModel", "Got coordinate from device: $coordinate")
+            debugLog("Got coordinate from device: $coordinate")
 
             val nearest = cityRepository.findNearestCity(
                 coordinate.latitude,
                 coordinate.longitude
             )
-            Log.d("OnboardingViewModel", "Nearest city for $coordinate is $nearest")
+            debugLog("Nearest city for $coordinate is $nearest")
             val label = nearest?.let { formatNearestCityLabel(it) }
-            _state.value = _state.value.copy(deviceNearestCityLabel = label)
+            val settings = settingsStore.load().copy(
+                locationMode = LocationMode.DEVICE,
+                lastResolvedDeviceLocation = coordinate
+            )
+            settingsStore.save(settings)
+            _state.value = _state.value.copy(
+                deviceNearestCityLabel = label,
+                deviceLocationLookupFailed = label == null
+            )
+            refreshReadinessInternal()
         }
     }
 
@@ -327,6 +359,18 @@ class OnboardingViewModel(
             "${city.name}, $region, ${city.countryCode}"
         } else {
             "${city.name}, ${city.countryCode}"
+        }
+    }
+
+    private fun debugLog(message: String) {
+        runCatching {
+            android.util.Log.d("OnboardingViewModel", message)
+        }
+    }
+
+    private fun warnLog(message: String) {
+        runCatching {
+            android.util.Log.w("OnboardingViewModel", message)
         }
     }
 }

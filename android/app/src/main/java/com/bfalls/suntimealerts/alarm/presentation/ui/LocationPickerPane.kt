@@ -41,6 +41,7 @@ data class LocationPickerUiState(
     val locationMode: LocationMode = LocationMode.DEVICE,
     val locationPermissionPermanentlyDenied: Boolean = false,
     val locationPermissionMissing: Boolean = false,
+    val deviceLocationLookupFailed: Boolean = false,
     val deviceNearestCityLabel: String? = null,
     val fixedLatitude: String = "",
     val fixedLongitude: String = "",
@@ -188,7 +189,14 @@ fun LocationPickerPane(
         }
         if (state.locationMode == LocationMode.DEVICE) {
             when (val label = state.deviceNearestCityLabel) {
-                null -> Text("Finding nearest city...")
+                null -> if (state.deviceLocationLookupFailed) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("We could not get a device location yet.")
+                        Text("Switch to Manual to choose a city, or try Device again once location is available.")
+                    }
+                } else {
+                    Text("Finding nearest city...")
+                }
                 else -> Text("Nearest city: $label")
             }
         }

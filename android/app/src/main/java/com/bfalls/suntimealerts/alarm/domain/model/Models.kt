@@ -35,6 +35,7 @@ enum class SkyBodySize {
 data class UserSettings(
     val locationMode: LocationMode,
     val fixedLocation: Coordinate? = null,
+    val lastResolvedDeviceLocation: Coordinate? = null,
     val sunriseConfig: SunAlarmConfig,
     val sunsetConfig: SunAlarmConfig,
     val timeFormat24h: Boolean,

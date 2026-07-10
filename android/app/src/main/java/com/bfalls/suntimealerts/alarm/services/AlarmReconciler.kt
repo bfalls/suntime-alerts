@@ -39,6 +39,7 @@ class AlarmReconciler(
         return when (settings.locationMode) {
             LocationMode.FIXED -> settings.fixedLocation
             LocationMode.DEVICE -> locationProvider.currentCoordinate()
+                ?: settings.lastResolvedDeviceLocation
         }
     }
 }
