@@ -8,6 +8,7 @@ import com.bfalls.suntimealerts.alarm.data.LocationService
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.data.SettingsStore
 import com.bfalls.suntimealerts.alarm.data.SunScheduleService
+import com.bfalls.suntimealerts.alarm.data.SunScheduler
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
@@ -17,7 +18,7 @@ class AlarmReconciler(
     private val context: Context,
     private val settingsStore: SettingsRepository = SettingsStore(context),
     private val locationProvider: LocationProvider = LocationService(context.applicationContext as Application),
-    private val scheduleService: SunScheduleService = SunScheduleService(
+    private val scheduleService: SunScheduler = SunScheduleService(
         calculator = SunTimesCalculator(),
         settingsStore = settingsStore,
         notificationScheduler = NotificationScheduler(context)
@@ -27,9 +28,14 @@ class AlarmReconciler(
 
     suspend fun reconcile(reason: String? = null) {
         val settings = settingsStore.load()
-        val coordinate = resolveCoordinate(settings) ?: Coordinate(0.0, 0.0)
-        Log.i(
-            "AlarmReconciler",
+        val coordinate = resolveCoordinate(settings)
+        if (coordinate == null) {
+            warnLog(
+                "Skipping alarm reconciliation${reason?.let { " ($it)" } ?: ""} because no usable coordinate is available."
+            )
+            return
+        }
+        infoLog(
             "Reconciling alarms${reason?.let { " ($it)" } ?: ""} using coordinate=$coordinate and zone=$zoneId"
         )
         scheduleService.schedule(coordinate, zoneId)
@@ -40,6 +46,18 @@ class AlarmReconciler(
             LocationMode.FIXED -> settings.fixedLocation
             LocationMode.DEVICE -> locationProvider.currentCoordinate()
                 ?: settings.lastResolvedDeviceLocation
+        }
+    }
+
+    private fun infoLog(message: String) {
+        runCatching {
+            Log.i("AlarmReconciler", message)
+        }
+    }
+
+    private fun warnLog(message: String) {
+        runCatching {
+            Log.w("AlarmReconciler", message)
         }
     }
 }

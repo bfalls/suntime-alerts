@@ -51,6 +51,7 @@ data class AlarmReadinessInputs(
     val locationMode: LocationMode,
     val fixedLocationAvailable: Boolean,
     val locationPermissionGranted: Boolean,
+    val lastResolvedDeviceLocationAvailable: Boolean,
     val runtimeNotificationPermissionGranted: Boolean,
     val appNotificationsEnabled: Boolean,
     val notificationChannelBlocked: Boolean,
@@ -63,7 +64,8 @@ object AlarmReadinessEvaluator {
     fun evaluate(inputs: AlarmReadinessInputs): AlarmReadiness {
         val locationReady = when (inputs.locationMode) {
             LocationMode.FIXED -> inputs.fixedLocationAvailable
-            LocationMode.DEVICE -> inputs.locationPermissionGranted
+            LocationMode.DEVICE -> inputs.locationPermissionGranted &&
+                inputs.lastResolvedDeviceLocationAvailable
         }
         val notificationsReady =
             inputs.runtimeNotificationPermissionGranted && inputs.appNotificationsEnabled
@@ -74,7 +76,7 @@ object AlarmReadinessEvaluator {
             !inputs.usesFullScreenAlarmUi || inputs.fullScreenIntentPermissionGranted
         val bootRescheduleReady = when (inputs.locationMode) {
             LocationMode.FIXED -> inputs.fixedLocationAvailable
-            LocationMode.DEVICE -> inputs.locationPermissionGranted
+            LocationMode.DEVICE -> inputs.lastResolvedDeviceLocationAvailable
         }
 
         val missingCapabilities = buildList {
@@ -141,6 +143,7 @@ class AlarmReadinessService(
             locationMode = settings.locationMode,
             fixedLocationAvailable = settings.fixedLocation != null,
             locationPermissionGranted = hasLocationPermission(context),
+            lastResolvedDeviceLocationAvailable = settings.lastResolvedDeviceLocation != null,
             runtimeNotificationPermissionGranted = hasNotificationPermission(context),
             appNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
             notificationChannelBlocked = hasBlockedAlarmNotificationChannel(settings),

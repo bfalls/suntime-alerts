@@ -28,7 +28,8 @@ class AlarmReadinessEvaluatorTest {
             readyInputs(
                 locationMode = LocationMode.DEVICE,
                 fixedLocationAvailable = false,
-                locationPermissionGranted = false
+                locationPermissionGranted = false,
+                lastResolvedDeviceLocationAvailable = false
             )
         )
 
@@ -45,6 +46,29 @@ class AlarmReadinessEvaluatorTest {
         assertEquals(
             listOf(AlarmRepairAction.REQUEST_LOCATION_PERMISSION),
             readiness.repairActions
+        )
+    }
+
+    @Test
+    fun deviceLocationRequiresPersistedCoordinateForBootReadiness() {
+        val readiness = AlarmReadinessEvaluator.evaluate(
+            readyInputs(
+                locationMode = LocationMode.DEVICE,
+                fixedLocationAvailable = false,
+                locationPermissionGranted = true,
+                lastResolvedDeviceLocationAvailable = false
+            )
+        )
+
+        assertFalse(readiness.locationReady)
+        assertFalse(readiness.bootRescheduleReady)
+        assertFalse(readiness.canDeliverReliableAlerts)
+        assertEquals(
+            listOf(
+                AlarmReadinessIssue.LOCATION,
+                AlarmReadinessIssue.BOOT_RESCHEDULE
+            ),
+            readiness.missingCapabilities
         )
     }
 
@@ -181,6 +205,7 @@ class AlarmReadinessEvaluatorTest {
         locationMode: LocationMode = LocationMode.FIXED,
         fixedLocationAvailable: Boolean = true,
         locationPermissionGranted: Boolean = true,
+        lastResolvedDeviceLocationAvailable: Boolean = true,
         runtimeNotificationPermissionGranted: Boolean = true,
         appNotificationsEnabled: Boolean = true,
         notificationChannelBlocked: Boolean = false,
@@ -192,6 +217,7 @@ class AlarmReadinessEvaluatorTest {
         locationMode = locationMode,
         fixedLocationAvailable = fixedLocationAvailable,
         locationPermissionGranted = locationPermissionGranted,
+        lastResolvedDeviceLocationAvailable = lastResolvedDeviceLocationAvailable,
         runtimeNotificationPermissionGranted = runtimeNotificationPermissionGranted,
         appNotificationsEnabled = appNotificationsEnabled,
         notificationChannelBlocked = notificationChannelBlocked,
