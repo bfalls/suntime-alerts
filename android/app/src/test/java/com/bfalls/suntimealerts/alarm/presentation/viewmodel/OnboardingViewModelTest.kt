@@ -95,6 +95,36 @@ class OnboardingViewModelTest {
         assertEquals(OnboardingStep.SUMMARY, viewModel.state.value.step)
     }
 
+    @Test
+    fun completeDoesNotFinishWhenRequiredReadinessIsMissing() = runTest {
+        val readinessProvider = FakeAlarmReadinessProvider(
+            readiness(exactAlarmReady = false)
+        )
+        val viewModel = createViewModel(readinessProvider)
+        advanceUntilIdle()
+        var finished = false
+
+        viewModel.complete { finished = true }
+        advanceUntilIdle()
+
+        assertEquals(false, finished)
+        assertEquals(false, viewModel.state.value.onboardingComplete)
+    }
+
+    @Test
+    fun completeFinishesWhenRequiredReadinessIsReady() = runTest {
+        val readinessProvider = FakeAlarmReadinessProvider(readiness())
+        val viewModel = createViewModel(readinessProvider)
+        advanceUntilIdle()
+        var finished = false
+
+        viewModel.complete { finished = true }
+        advanceUntilIdle()
+
+        assertEquals(true, finished)
+        assertEquals(true, viewModel.state.value.onboardingComplete)
+    }
+
     private fun createViewModel(
         readinessProvider: FakeAlarmReadinessProvider
     ): OnboardingViewModel = OnboardingViewModel(
