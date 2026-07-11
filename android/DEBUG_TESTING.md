@@ -53,3 +53,20 @@ Then verify:
 - Settings shows the matching repair action
 - Scheduling is skipped when exact alarms are denied
 - Reconcile behavior is deterministic when boot or timezone actions are triggered
+
+Real-device verification checklist:
+
+- Fresh install on API 33 or newer with notification allow and deny paths
+- Exact alarm allow and deny on API 31 or newer
+- Location allow, deny, approximate-only, and manual city fallback
+- Blocked notification channel
+- Full-screen intent enabled and disabled on Android 14 or newer
+- Debug boot reconcile and debug timezone reconcile
+- Debug app resume after toggling system settings
+
+Firebase Test Lab matrix proposal:
+
+- Physical Pixel 5 on API 34
+- Physical Pixel 4a on API 33
+- Physical Pixel 4 on API 31
+- Virtual API 35 emulator for smoke coverage only

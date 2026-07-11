@@ -31,6 +31,7 @@ Suntime Alerts is a dual-native mobile app (iOS + Android) that schedules alarms
 2. Sync Gradle to download dependencies.
 3. Run the `app` configuration on an API 26+ emulator or device.
 4. The Gradle wrapper JAR is checked in. If you need to regenerate it, use `./gradlew wrapper --gradle-version 8.13`.
+5. For permission and readiness verification, prefer real devices over emulators. See `android/DEBUG_TESTING.md`.
 
 ## Development principles
 - Shared domain concepts: `SunEventType`, `SunEvent`, `SunAlarmConfig`, `UserSettings`.
@@ -51,5 +52,36 @@ Use these commands to confirm that the system AlarmManager state matches in-app 
    ```bash
    adb shell am broadcast -a com.bfalls.suntimealerts.DEBUG_RECONCILE_ALARMS
    ```
+
+## Android: real-device verification plan
+Use physical devices for permission-sensitive verification. Emulators are useful for smoke tests, but they are not the source of truth for location, notifications, exact alarms, reboot recovery, or full-screen intent behavior.
+
+Recommended manual matrix:
+
+- API 33 or newer fresh install: allow notifications, allow location, allow exact alarms, confirm onboarding completes and Home has no repair banner
+- API 33 or newer fresh install: deny notifications, confirm onboarding can still finish and Home plus Settings show notification repair actions
+- API 31 or newer fresh install: deny exact alarms, confirm onboarding can still finish, scheduling is skipped, and Home plus Settings show exact alarm repair actions
+- Device location mode: allow approximate-only location, confirm nearest city resolves and readiness remains healthy
+- Device location mode: deny location, confirm manual city fallback is available and readiness degrades clearly
+- Manual city mode: pick a city without device location and confirm alerts can still be ready
+- Block the alarm notification channel, confirm Home plus Settings expose channel repair
+- Disable full-screen alarm permission on Android 14 or newer, confirm alarm notifications still appear and Home plus Settings expose full-screen repair
+- Reboot device with enabled alarms, confirm boot reconcile restores alarms
+- Change timezone with enabled alarms, confirm timezone reconcile reschedules alarms correctly
+
+Firebase Test Lab proposal:
+
+- Physical Pixel 5 or newer on API 34
+- Physical Pixel 4a or equivalent on API 33
+- Physical Pixel 4 on API 31
+- Virtual API 35 for broad smoke coverage only
+
+Suggested split:
+
+- Instrumentation UI tests: deterministic Compose state assertions and debug-hook driven flows
+- Unit tests: readiness evaluator, reconcile logic, scheduling gates
+- Manual physical-device pass before release: every permission and settings regression path
+
+See `android/DEBUG_TESTING.md` for the debug broadcast commands used during real-device runs.
 
 See [DESIGN.md](DESIGN.md) for detailed flows, algorithms, and extension notes.

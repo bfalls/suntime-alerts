@@ -2,13 +2,13 @@ package com.bfalls.suntimealerts.alarm.presentation.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
@@ -129,7 +129,7 @@ class HomeScreenAppBarTest {
         composeTestRule.onNodeWithText("Minutes").assertExists()
         composeTestRule.onNodeWithContentDescription("Cancel").performClick()
 
-        composeTestRule.onNodeWithText("Label").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Label").assertDoesNotExistCompat()
     }
 
     @Test
@@ -178,3 +178,10 @@ class HomeScreenAppBarTest {
             .assert(SemanticsMatcher.expectValue(MoonVisibleKey, true))
     }
 }
+
+private fun SemanticsNodeInteraction.assertDoesNotExistCompat(): SemanticsNodeInteraction =
+    apply {
+        check(runCatching { fetchSemanticsNode() }.isFailure) {
+            "Expected node to not exist"
+        }
+    }
