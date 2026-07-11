@@ -84,7 +84,11 @@ class MainActivity : ComponentActivity() {
             val scheduleService = remember { SunScheduleService(sunTimesCalculator, settingsStore, notificationScheduler) }
             val cityRepository = remember { CityRepository(applicationContext) }
             val alarmReadinessService = remember {
-                AlarmReadinessService(applicationContext, settingsStore)
+                AlarmReadinessService(
+                    context = applicationContext,
+                    settingsStore = settingsStore,
+                    usesFullScreenAlarmUi = true
+                )
             }
             val homeViewModel = remember {
                 HomeViewModel(
@@ -141,6 +145,18 @@ class MainActivity : ComponentActivity() {
             }
             val openExactAlarmSettings = {
                 startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+            }
+            val openFullScreenIntentSettings = {
+                val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                } else {
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                }
+                startActivity(intent)
             }
             val notificationPermissionLauncher =
                 rememberLauncherForActivityResult(
@@ -437,7 +453,8 @@ class MainActivity : ComponentActivity() {
                             onOpenNotificationChannelSettings = { channelId ->
                                 openChannelNotificationSettings(channelId)
                             },
-                            onOpenExactAlarmSettings = openExactAlarmSettings
+                            onOpenExactAlarmSettings = openExactAlarmSettings,
+                            onOpenFullScreenIntentSettings = openFullScreenIntentSettings
                         )
                     }
                 }

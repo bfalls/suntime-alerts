@@ -30,9 +30,9 @@ import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.service.AlarmOccurrenceCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
+import com.bfalls.suntimealerts.alarm.presentation.ui.AlarmRingingActivity
 import com.bfalls.suntimealerts.alarm.services.SunEventIntentFactory
 import com.bfalls.suntimealerts.alarm.services.SunEventIntentFactory.ACTION_SUN_EVENT_ALARM
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -356,12 +356,19 @@ class SunEventReceiver : BroadcastReceiver() {
             putExtra("alarmId", alarmId)
         }
 
-        val contentIntent = PendingIntent.getBroadcast(
+        val dismissPendingIntent = PendingIntent.getBroadcast(
             context,
             alarmId.hashCode(),
             dismissIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val fullScreenIntent = buildFullScreenPendingIntent(
+            context = context,
+            alarmId = alarmId,
+            title = title,
+            body = body
+        )
+        val canUseFullScreenIntent = canUseFullScreenIntent(context)
 
         val notification = NotificationCompat.Builder(context, notificationChannelId)
             .setSmallIcon(R.drawable.ic_dialog_info)
@@ -371,14 +378,17 @@ class SunEventReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setContentIntent(contentIntent)
-            .setDeleteIntent(contentIntent)
+            .setContentIntent(fullScreenIntent)
+            .setDeleteIntent(dismissPendingIntent)
             .apply {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                     if (parsedSoundUri != null) {
                         setSound(parsedSoundUri)
                     }
                     setVibrate(vibrationPattern)
+                }
+                if (canUseFullScreenIntent) {
+                    setFullScreenIntent(fullScreenIntent, true)
                 }
             }
             .setAutoCancel(true)
@@ -405,31 +415,44 @@ class SunEventReceiver : BroadcastReceiver() {
             }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val appOps = context.getSystemService(AppOpsManager::class.java)
-            val op = "android:use_full_screen_intent" // constant not available pre-Upside Down Cake in older SDKs
-            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                appOps.unsafeCheckOpNoThrow(
-                    op,
-                    context.applicationInfo.uid,
-                    context.packageName
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                appOps.checkOpNoThrow(
-                    op,
-                    context.applicationInfo.uid,
-                    context.packageName
-                )
-            }
-            if (mode != AppOpsManager.MODE_ALLOWED) {
-                Log.w(
-                    "SunEventReceiver",
-                    "Full-screen intent not allowed by user/system (mode=$mode). " +
-                            "Guide the user to allow full-screen notifications in system settings."
-                )
-            }
+        if (!canUseFullScreenIntent) {
+            Log.w(
+                "SunEventReceiver",
+                "Full-screen intent not allowed by user/system. Falling back to high-priority alarm notification."
+            )
         }
+    }
+
+    private fun buildFullScreenPendingIntent(
+        context: Context,
+        alarmId: String,
+        title: String,
+        body: String
+    ): PendingIntent {
+        val intent = Intent(context, AlarmRingingActivity::class.java).apply {
+            putExtra(AlarmRingingActivity.EXTRA_ALARM_ID, alarmId)
+            putExtra(AlarmRingingActivity.EXTRA_TITLE, title)
+            putExtra(AlarmRingingActivity.EXTRA_BODY, body)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        return PendingIntent.getActivity(
+            context,
+            alarmId.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun canUseFullScreenIntent(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            return notificationManager.canUseFullScreenIntent()
+        }
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.USE_FULL_SCREEN_INTENT
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private suspend fun rescheduleNextOccurrence(

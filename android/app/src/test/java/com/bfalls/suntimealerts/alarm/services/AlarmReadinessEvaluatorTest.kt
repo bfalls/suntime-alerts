@@ -205,10 +205,7 @@ class AlarmReadinessEvaluatorTest {
         )
 
         assertFalse(readiness.fullScreenIntentReady)
-        assertEquals(
-            listOf(AlarmReadinessIssue.FULL_SCREEN_INTENT),
-            readiness.missingCapabilities
-        )
+        assertTrue(readiness.canDeliverReliableAlerts)
         assertEquals(
             listOf(AlarmRepairAction.OPEN_FULL_SCREEN_INTENT_SETTINGS),
             readiness.repairActions

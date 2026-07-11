@@ -86,7 +86,6 @@ object AlarmReadinessEvaluator {
             if (!notificationsReady) add(AlarmReadinessIssue.NOTIFICATIONS)
             if (!notificationChannelReady) add(AlarmReadinessIssue.NOTIFICATION_CHANNEL)
             if (!exactAlarmReady) add(AlarmReadinessIssue.EXACT_ALARM)
-            if (!fullScreenIntentReady) add(AlarmReadinessIssue.FULL_SCREEN_INTENT)
             if (!bootRescheduleReady) add(AlarmReadinessIssue.BOOT_RESCHEDULE)
         }
         val repairActions = buildList {

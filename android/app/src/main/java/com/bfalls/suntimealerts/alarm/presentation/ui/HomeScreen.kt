@@ -152,7 +152,8 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenNotificationChannelSettings: (String?) -> Unit,
-    onOpenExactAlarmSettings: () -> Unit
+    onOpenExactAlarmSettings: () -> Unit,
+    onOpenFullScreenIntentSettings: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -178,7 +179,8 @@ fun HomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenNotificationSettings = onOpenNotificationSettings,
         onOpenNotificationChannelSettings = onOpenNotificationChannelSettings,
-        onOpenExactAlarmSettings = onOpenExactAlarmSettings
+        onOpenExactAlarmSettings = onOpenExactAlarmSettings,
+        onOpenFullScreenIntentSettings = onOpenFullScreenIntentSettings
     )
 }
 
@@ -195,7 +197,8 @@ fun HomeScreenContent(
     onOpenSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenNotificationChannelSettings: (String?) -> Unit,
-    onOpenExactAlarmSettings: () -> Unit
+    onOpenExactAlarmSettings: () -> Unit,
+    onOpenFullScreenIntentSettings: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -284,7 +287,8 @@ fun HomeScreenContent(
                             state = state,
                             onOpenNotificationSettings = onOpenNotificationSettings,
                             onOpenNotificationChannelSettings = onOpenNotificationChannelSettings,
-                            onOpenExactAlarmSettings = onOpenExactAlarmSettings
+                            onOpenExactAlarmSettings = onOpenExactAlarmSettings,
+                            onOpenFullScreenIntentSettings = onOpenFullScreenIntentSettings
                         )
                     }
                     stickyHeader {
@@ -368,13 +372,15 @@ private fun AlarmReadinessBanner(
     state: HomeViewModel.State,
     onOpenNotificationSettings: () -> Unit,
     onOpenNotificationChannelSettings: (String?) -> Unit,
-    onOpenExactAlarmSettings: () -> Unit
+    onOpenExactAlarmSettings: () -> Unit,
+    onOpenFullScreenIntentSettings: () -> Unit
 ) {
     val readiness = state.alarmReadiness ?: return
     val needsRepair =
         !readiness.notificationsReady ||
             !readiness.notificationChannelReady ||
-            !readiness.exactAlarmReady
+            !readiness.exactAlarmReady ||
+            !readiness.fullScreenIntentReady
     if (!needsRepair) return
 
     Surface(
@@ -395,6 +401,8 @@ private fun AlarmReadinessBanner(
             )
             Text(
                 text = when {
+                    !readiness.fullScreenIntentReady ->
+                        "Full-screen alarm pop-ups are disabled, so alarms will fall back to a high-priority notification instead of opening over the lock screen."
                     !readiness.exactAlarmReady ->
                         "Exact alarm access is off, so Android will not schedule reliable sunrise and sunset alerts."
                     !readiness.notificationsReady ->
@@ -408,6 +416,11 @@ private fun AlarmReadinessBanner(
                 if (readiness.repairActions.contains(AlarmRepairAction.REQUEST_EXACT_ALARM_PERMISSION)) {
                     Button(onClick = onOpenExactAlarmSettings) {
                         Text("Alarms & reminders")
+                    }
+                }
+                if (readiness.repairActions.contains(AlarmRepairAction.OPEN_FULL_SCREEN_INTENT_SETTINGS)) {
+                    Button(onClick = onOpenFullScreenIntentSettings) {
+                        Text("Full-screen alarms")
                     }
                 }
                 if (readiness.repairActions.contains(AlarmRepairAction.OPEN_NOTIFICATION_SETTINGS)) {

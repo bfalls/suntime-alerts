@@ -73,7 +73,8 @@ class HomeScreenAppBarTest {
                     onOpenSettings = {},
                     onOpenNotificationSettings = {},
                     onOpenNotificationChannelSettings = {},
-                    onOpenExactAlarmSettings = {}
+                    onOpenExactAlarmSettings = {},
+                    onOpenFullScreenIntentSettings = {}
                 )
             }
         }
@@ -113,7 +114,8 @@ class HomeScreenAppBarTest {
                     onOpenSettings = {},
                     onOpenNotificationSettings = {},
                     onOpenNotificationChannelSettings = {},
-                    onOpenExactAlarmSettings = {}
+                    onOpenExactAlarmSettings = {},
+                    onOpenFullScreenIntentSettings = {}
                 )
             }
         }
@@ -166,7 +168,8 @@ class HomeScreenAppBarTest {
                     onOpenSettings = {},
                     onOpenNotificationSettings = {},
                     onOpenNotificationChannelSettings = {},
-                    onOpenExactAlarmSettings = {}
+                    onOpenExactAlarmSettings = {},
+                    onOpenFullScreenIntentSettings = {}
                 )
             }
         }
