@@ -69,7 +69,11 @@ class HomeScreenAppBarTest {
                     onToggleAlarmEnabled = { _, _ -> },
                     onDeleteAlarm = {},
                     onDuplicateAlarm = { _ -> },
-                    onRestoreAlarm = {}
+                    onRestoreAlarm = { _, _ -> },
+                    onOpenSettings = {},
+                    onOpenNotificationSettings = {},
+                    onOpenNotificationChannelSettings = {},
+                    onOpenExactAlarmSettings = {}
                 )
             }
         }
@@ -105,7 +109,11 @@ class HomeScreenAppBarTest {
                     onToggleAlarmEnabled = { _, _ -> },
                     onDeleteAlarm = {},
                     onDuplicateAlarm = { _ -> },
-                    onRestoreAlarm = {}
+                    onRestoreAlarm = { _, _ -> },
+                    onOpenSettings = {},
+                    onOpenNotificationSettings = {},
+                    onOpenNotificationChannelSettings = {},
+                    onOpenExactAlarmSettings = {}
                 )
             }
         }
@@ -154,7 +162,11 @@ class HomeScreenAppBarTest {
                     onToggleAlarmEnabled = { _, _ -> },
                     onDeleteAlarm = {},
                     onDuplicateAlarm = { _ -> },
-                    onRestoreAlarm = {}
+                    onRestoreAlarm = { _, _ -> },
+                    onOpenSettings = {},
+                    onOpenNotificationSettings = {},
+                    onOpenNotificationChannelSettings = {},
+                    onOpenExactAlarmSettings = {}
                 )
             }
         }

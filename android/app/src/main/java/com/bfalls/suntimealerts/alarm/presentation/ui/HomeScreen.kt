@@ -151,7 +151,8 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onOpenSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
-    onOpenNotificationChannelSettings: (String?) -> Unit
+    onOpenNotificationChannelSettings: (String?) -> Unit,
+    onOpenExactAlarmSettings: () -> Unit
 ) {
     val state by viewModel.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -176,7 +177,8 @@ fun HomeScreen(
         onRestoreAlarm = viewModel::restoreAlarm,
         onOpenSettings = onOpenSettings,
         onOpenNotificationSettings = onOpenNotificationSettings,
-        onOpenNotificationChannelSettings = onOpenNotificationChannelSettings
+        onOpenNotificationChannelSettings = onOpenNotificationChannelSettings,
+        onOpenExactAlarmSettings = onOpenExactAlarmSettings
     )
 }
 
@@ -192,7 +194,8 @@ fun HomeScreenContent(
     onRestoreAlarm: (SunAlarm, Int) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
-    onOpenNotificationChannelSettings: (String?) -> Unit
+    onOpenNotificationChannelSettings: (String?) -> Unit,
+    onOpenExactAlarmSettings: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -277,10 +280,11 @@ fun HomeScreenContent(
                     contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
                     item {
-                        NotificationReadinessBanner(
+                        AlarmReadinessBanner(
                             state = state,
                             onOpenNotificationSettings = onOpenNotificationSettings,
-                            onOpenNotificationChannelSettings = onOpenNotificationChannelSettings
+                            onOpenNotificationChannelSettings = onOpenNotificationChannelSettings,
+                            onOpenExactAlarmSettings = onOpenExactAlarmSettings
                         )
                     }
                     stickyHeader {
@@ -360,15 +364,18 @@ fun HomeScreenContent(
 }
 
 @Composable
-private fun NotificationReadinessBanner(
+private fun AlarmReadinessBanner(
     state: HomeViewModel.State,
     onOpenNotificationSettings: () -> Unit,
-    onOpenNotificationChannelSettings: (String?) -> Unit
+    onOpenNotificationChannelSettings: (String?) -> Unit,
+    onOpenExactAlarmSettings: () -> Unit
 ) {
     val readiness = state.alarmReadiness ?: return
-    val needsNotificationRepair =
-        !readiness.notificationsReady || !readiness.notificationChannelReady
-    if (!needsNotificationRepair) return
+    val needsRepair =
+        !readiness.notificationsReady ||
+            !readiness.notificationChannelReady ||
+            !readiness.exactAlarmReady
+    if (!needsRepair) return
 
     Surface(
         modifier = Modifier
@@ -382,12 +389,14 @@ private fun NotificationReadinessBanner(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Alerts need notification access",
+                text = "Alerts need attention",
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = when {
+                    !readiness.exactAlarmReady ->
+                        "Exact alarm access is off, so Android will not schedule reliable sunrise and sunset alerts."
                     !readiness.notificationsReady ->
                         "Android is blocking app notifications, so sunrise and sunset alerts cannot fire."
                     else ->
@@ -396,6 +405,11 @@ private fun NotificationReadinessBanner(
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (readiness.repairActions.contains(AlarmRepairAction.REQUEST_EXACT_ALARM_PERMISSION)) {
+                    Button(onClick = onOpenExactAlarmSettings) {
+                        Text("Alarms & reminders")
+                    }
+                }
                 if (readiness.repairActions.contains(AlarmRepairAction.OPEN_NOTIFICATION_SETTINGS)) {
                     Button(onClick = onOpenNotificationSettings) {
                         Text("App settings")

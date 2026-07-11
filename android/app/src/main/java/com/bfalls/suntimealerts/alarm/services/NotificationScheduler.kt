@@ -111,15 +111,15 @@ class NotificationScheduler(private val context: Context) : AlarmScheduler {
             true
         }
 
-        if (canScheduleExact) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pending)
-        } else {
+        if (!canScheduleExact) {
             Log.w(
                 "NotificationScheduler",
-                "Exact alarms not permitted; scheduling inexact alarm instead."
+                "Exact alarms not permitted; skipping schedule for ${eventType.name.lowercase()} alarmId=$alarmId on $date."
             )
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pending)
+            return
         }
+
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pending)
     }
 
     override fun cancelOccurrence(

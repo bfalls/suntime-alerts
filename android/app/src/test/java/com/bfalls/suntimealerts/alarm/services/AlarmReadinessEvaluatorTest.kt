@@ -157,6 +157,19 @@ class AlarmReadinessEvaluatorTest {
     }
 
     @Test
+    fun exactAlarmGrantedOnAndroidTwelveIsReady() {
+        val readiness = AlarmReadinessEvaluator.evaluate(
+            readyInputs(
+                apiLevel = 31,
+                exactAlarmPermissionGranted = true
+            )
+        )
+
+        assertTrue(readiness.exactAlarmReady)
+        assertTrue(readiness.canDeliverReliableAlerts)
+    }
+
+    @Test
     fun exactAlarmPermissionIsNotRequiredBeforeAndroidTwelve() {
         val readiness = AlarmReadinessEvaluator.evaluate(
             readyInputs(

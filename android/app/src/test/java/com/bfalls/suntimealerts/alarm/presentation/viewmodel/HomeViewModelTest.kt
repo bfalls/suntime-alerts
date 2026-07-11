@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.ZoneId
@@ -66,6 +67,81 @@ class HomeViewModelTest {
         assertEquals(0, locationProvider.requestCount)
     }
 
+    @Test
+    fun loadStateSkipsSchedulingWhenExactAlarmReadinessIsMissing() = runTest {
+        val fixedCoordinate = Coordinate(12.34, 56.78)
+        val settings = UserSettings(
+            locationMode = LocationMode.FIXED,
+            fixedLocation = fixedCoordinate,
+            sunriseConfig = SunAlarmConfig(enabled = true, eventType = SunEventType.SUNRISE, offsetMinutes = 0),
+            sunsetConfig = SunAlarmConfig(enabled = false, eventType = SunEventType.SUNSET, offsetMinutes = 0),
+            timeFormat24h = true,
+            onboardingComplete = true,
+            alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Morning",
+                    enabled = true
+                )
+            )
+        )
+        val settingsRepo = FakeSettingsRepository(settings, settings.alarms)
+        val scheduler = RecordingScheduler()
+
+        HomeViewModel(
+            RecordingLocationProvider(),
+            settingsRepo,
+            scheduler,
+            SunTimesCalculator(),
+            FakeAlarmReadinessProvider(exactAlarmReady = false)
+        )
+
+        advanceUntilIdle()
+
+        assertTrue(scheduler.receivedCoordinates.isEmpty())
+    }
+
+    @Test
+    fun exactAlarmSettingsResultReschedulesWhenReadinessBecomesGranted() = runTest {
+        val fixedCoordinate = Coordinate(12.34, 56.78)
+        val settings = UserSettings(
+            locationMode = LocationMode.FIXED,
+            fixedLocation = fixedCoordinate,
+            sunriseConfig = SunAlarmConfig(enabled = true, eventType = SunEventType.SUNRISE, offsetMinutes = 0),
+            sunsetConfig = SunAlarmConfig(enabled = false, eventType = SunEventType.SUNSET, offsetMinutes = 0),
+            timeFormat24h = true,
+            onboardingComplete = true,
+            alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Morning",
+                    enabled = true
+                )
+            )
+        )
+        val settingsRepo = FakeSettingsRepository(settings, settings.alarms)
+        val scheduler = RecordingScheduler()
+        val readinessProvider = FakeAlarmReadinessProvider(exactAlarmReady = false)
+        val viewModel = HomeViewModel(
+            RecordingLocationProvider(),
+            settingsRepo,
+            scheduler,
+            SunTimesCalculator(),
+            readinessProvider
+        )
+
+        advanceUntilIdle()
+        assertTrue(scheduler.receivedCoordinates.isEmpty())
+
+        readinessProvider.current = readinessState(exactAlarmReady = true)
+        viewModel.handleExactAlarmSettingsResult()
+        advanceUntilIdle()
+
+        assertEquals(listOf(fixedCoordinate), scheduler.receivedCoordinates)
+    }
+
     private class FakeSettingsRepository(
         private var settings: UserSettings,
         private var alarms: List<SunAlarm>
@@ -105,18 +181,45 @@ class HomeViewModelTest {
         }
     }
 
-    private class FakeAlarmReadinessProvider : AlarmReadinessProvider {
-        override suspend fun readiness(): AlarmReadiness = AlarmReadiness(
+    private fun readinessState(
+        exactAlarmReady: Boolean = true
+    ): AlarmReadiness = AlarmReadiness(
+        locationReady = true,
+        notificationsReady = true,
+        notificationChannelReady = true,
+        blockedNotificationChannelId = null,
+        exactAlarmReady = exactAlarmReady,
+        fullScreenIntentReady = true,
+        bootRescheduleReady = true,
+        canDeliverReliableAlerts = exactAlarmReady,
+        missingCapabilities = if (exactAlarmReady) emptyList() else listOf(com.bfalls.suntimealerts.alarm.services.AlarmReadinessIssue.EXACT_ALARM),
+        repairActions = if (exactAlarmReady) emptyList() else listOf(com.bfalls.suntimealerts.alarm.services.AlarmRepairAction.REQUEST_EXACT_ALARM_PERMISSION)
+    )
+
+    private class FakeAlarmReadinessProvider(
+        exactAlarmReady: Boolean = true
+    ) : AlarmReadinessProvider {
+        var current: AlarmReadiness = AlarmReadiness(
             locationReady = true,
             notificationsReady = true,
             notificationChannelReady = true,
             blockedNotificationChannelId = null,
-            exactAlarmReady = true,
+            exactAlarmReady = exactAlarmReady,
             fullScreenIntentReady = true,
             bootRescheduleReady = true,
-            canDeliverReliableAlerts = true,
-            missingCapabilities = emptyList(),
-            repairActions = emptyList()
+            canDeliverReliableAlerts = exactAlarmReady,
+            missingCapabilities = if (exactAlarmReady) {
+                emptyList()
+            } else {
+                listOf(com.bfalls.suntimealerts.alarm.services.AlarmReadinessIssue.EXACT_ALARM)
+            },
+            repairActions = if (exactAlarmReady) {
+                emptyList()
+            } else {
+                listOf(com.bfalls.suntimealerts.alarm.services.AlarmRepairAction.REQUEST_EXACT_ALARM_PERMISSION)
+            }
         )
+
+        override suspend fun readiness(): AlarmReadiness = current
     }
 }

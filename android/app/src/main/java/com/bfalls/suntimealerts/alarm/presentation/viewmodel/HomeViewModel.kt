@@ -83,6 +83,15 @@ class HomeViewModel(
         viewModelScope.launch { loadState() }
     }
 
+    fun handleExactAlarmSettingsResult() {
+        viewModelScope.launch {
+            val readiness = refreshReadiness()
+            if (readiness.exactAlarmReady) {
+                scheduleForCurrentSettings(readiness)
+            }
+        }
+    }
+
     fun addAlarm(alarm: SunAlarm) {
         viewModelScope.launch {
             val current = _state.value
@@ -186,9 +195,11 @@ class HomeViewModel(
 
             refreshAstronomyState(settings = settings, alarms = alarms, placeholderSunTimes = placeholderSunTimes)
 
-            scheduleForCurrentSettings()
+            scheduleForCurrentSettings(readiness)
         } catch (t: Throwable) {
-            Log.e("HomeViewModel", "Failed to load state.", t)
+            runCatching {
+                Log.e("HomeViewModel", "Failed to load state.", t)
+            }
             _state.update { current ->
                 current.copy(
                     isLoading = false,
@@ -213,7 +224,7 @@ class HomeViewModel(
             sunsetAlarms = alarms.filter { it.type == SunEventType.SUNSET }.sortedBy { it.offsetMinutes },
             alarmReadiness = readiness
         )
-        scheduleForCurrentSettings()
+        scheduleForCurrentSettings(readiness)
     }
 
     private suspend fun refreshAstronomyState(
@@ -260,10 +271,28 @@ class HomeViewModel(
         }
     }
 
-    private suspend fun scheduleForCurrentSettings() {
+    private suspend fun scheduleForCurrentSettings(
+        readiness: AlarmReadiness? = _state.value.alarmReadiness
+    ) {
+        val resolvedReadiness = readiness ?: refreshReadiness()
+        if (!resolvedReadiness.exactAlarmReady) {
+            runCatching {
+                Log.w(
+                    "HomeViewModel",
+                    "Skipping alarm scheduling because exact alarm access is not granted."
+                )
+            }
+            return
+        }
         val settings = cachedSettings ?: settingsStore.load()
         val coordinate = resolveCoordinate(settings) ?: Coordinate(0.0, 0.0)
         scheduleService.schedule(coordinate, ZoneId.systemDefault())
+    }
+
+    private suspend fun refreshReadiness(): AlarmReadiness {
+        val readiness = alarmReadinessProvider.readiness()
+        _state.update { current -> current.copy(alarmReadiness = readiness) }
+        return readiness
     }
 
     private suspend fun resolveCoordinate(settings: UserSettings): Coordinate? {

@@ -259,10 +259,10 @@ private fun ExactAlarmsStep(
             } else {
                 "No action needed."
             },
-            fallback = "You can skip, but alarms may be delayed or unreliable."
+            fallback = "You can skip, but alerts will not be scheduled reliably until exact alarms are allowed."
         )
         Text(
-            "To trigger alerts at the right time, Suntime Alerts schedules alarms. We'll open the Alarms & reminders settings so you can allow exact alarms. You can skip and enable later."
+            "To trigger alerts at the right time, Suntime Alerts needs exact alarm access. We'll open the Alarms & reminders settings so you can allow it. If exact alarms stay off, the app will not treat alerts as reliably scheduled."
         )
         if (!permissionRequired) {
             Text("Not required on this Android version or already allowed.")

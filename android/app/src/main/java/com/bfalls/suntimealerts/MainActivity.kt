@@ -139,6 +139,9 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                 }
             }
+            val openExactAlarmSettings = {
+                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+            }
             val notificationPermissionLauncher =
                 rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission()
@@ -187,6 +190,7 @@ class MainActivity : ComponentActivity() {
                         onboardingViewModel.handleResume()
                         if (pendingExactAlarmPermissionRequest) {
                             onboardingViewModel.handleExactAlarmSettingsResult()
+                            homeViewModel.handleExactAlarmSettingsResult()
                             pendingExactAlarmPermissionRequest = false
                         }
                     }
@@ -403,7 +407,7 @@ class MainActivity : ComponentActivity() {
                                         ) == true
                                     ) {
                                         pendingExactAlarmPermissionRequest = true
-                                        startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                        openExactAlarmSettings()
                                     }
                                 },
                                 onExactAlarmsSkip = {
@@ -432,7 +436,8 @@ class MainActivity : ComponentActivity() {
                             onOpenNotificationSettings = openAppNotificationSettings,
                             onOpenNotificationChannelSettings = { channelId ->
                                 openChannelNotificationSettings(channelId)
-                            }
+                            },
+                            onOpenExactAlarmSettings = openExactAlarmSettings
                         )
                     }
                 }
