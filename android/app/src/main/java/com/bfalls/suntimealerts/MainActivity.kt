@@ -64,14 +64,18 @@ import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
 import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 
 
 class MainActivity : ComponentActivity() {
     private val settingsStore: SettingsStore by lazy { SettingsStore(applicationContext) }
+    private val debugRefreshReadinessTick = MutableStateFlow(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        consumeDebugRefreshIntent(intent)
         runBlocking {
             applyAppThemeMode(settingsStore.load().appThemeMode)
         }
@@ -122,6 +126,7 @@ class MainActivity : ComponentActivity() {
                 factory = CityImportViewModelFactory(cityRepository)
             )
             val cityImportState by cityImportViewModel.state.collectAsState()
+            val debugRefreshTick by debugRefreshReadinessTick.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
@@ -306,6 +311,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(debugRefreshTick) {
+                if (debugRefreshTick > 0) {
+                    onboardingViewModel.handleResume()
+                    homeViewModel.refresh()
+                    settingsViewModel.refreshReadiness()
+                }
+            }
+
             val appThemeMode = settingsState.appThemeMode
             val darkTheme = when (appThemeMode) {
                 AppThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -475,5 +488,22 @@ class MainActivity : ComponentActivity() {
             AppThemeMode.DARK -> AppCompatDelegate.MODE_NIGHT_YES
         }
         AppCompatDelegate.setDefaultNightMode(nightMode)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeDebugRefreshIntent(intent)
+    }
+
+    private fun consumeDebugRefreshIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_DEBUG_REFRESH_READINESS, false) == true) {
+            debugRefreshReadinessTick.update { it + 1 }
+            intent.removeExtra(EXTRA_DEBUG_REFRESH_READINESS)
+        }
+    }
+
+    companion object {
+        const val EXTRA_DEBUG_REFRESH_READINESS = "debug_refresh_readiness"
     }
 }

@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.bfalls.suntimealerts.alarm.debug.DebugAlarmOverride
+import com.bfalls.suntimealerts.alarm.debug.DebugAlarmTestOverrides
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -22,9 +24,19 @@ interface LocationProvider {
 class LocationService(private val application: Application) : LocationProvider {
     private val client: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(application)
+    private val debugOverrides = DebugAlarmTestOverrides(application.applicationContext)
 
     @SuppressLint("MissingPermission")
     override suspend fun currentCoordinate(): Coordinate? {
+        if (debugOverrides.isEnabled(DebugAlarmOverride.LOCATION_PERMISSION_DENIED)) {
+            Log.w("LocationService", "Debug override forcing location permission denied")
+            return null
+        }
+        if (debugOverrides.isEnabled(DebugAlarmOverride.LOCATION_UNAVAILABLE)) {
+            Log.w("LocationService", "Debug override forcing location unavailable")
+            return null
+        }
+
         // Fast check: if we don't have location permission, bail out immediately
         val fineGranted = ContextCompat.checkSelfPermission(
             application,

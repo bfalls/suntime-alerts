@@ -10,6 +10,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.data.SettingsStore
+import com.bfalls.suntimealerts.alarm.debug.DebugAlarmOverride
+import com.bfalls.suntimealerts.alarm.debug.DebugAlarmTestOverrides
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.utils.hasLocationPermission
@@ -135,6 +137,8 @@ class AlarmReadinessService(
     private val settingsStore: SettingsRepository = SettingsStore(context),
     private val usesFullScreenAlarmUi: Boolean = false
 ) : AlarmReadinessProvider {
+    private val debugOverrides = DebugAlarmTestOverrides(context.applicationContext)
+
     override suspend fun readiness(): AlarmReadiness {
         return AlarmReadinessEvaluator.evaluate(inputs(settingsStore.load()))
     }
@@ -145,9 +149,13 @@ class AlarmReadinessService(
             locationMode = settings.locationMode,
             fixedLocationAvailable = settings.fixedLocation != null,
             locationPermissionGranted = hasLocationPermission(context),
-            lastResolvedDeviceLocationAvailable = settings.lastResolvedDeviceLocation != null,
+            lastResolvedDeviceLocationAvailable =
+                settings.lastResolvedDeviceLocation != null &&
+                    !debugOverrides.isEnabled(DebugAlarmOverride.LOCATION_UNAVAILABLE),
             runtimeNotificationPermissionGranted = hasNotificationPermission(context),
-            appNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
+            appNotificationsEnabled =
+                NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+                    !debugOverrides.isEnabled(DebugAlarmOverride.APP_NOTIFICATIONS_DISABLED),
             notificationChannelBlocked = blockedAlarmNotificationChannel(settings) != null,
             blockedNotificationChannelId = blockedAlarmNotificationChannel(settings),
             exactAlarmPermissionGranted = canScheduleExactAlarms(),
@@ -157,12 +165,16 @@ class AlarmReadinessService(
     }
 
     private fun canScheduleExactAlarms(): Boolean {
+        if (debugOverrides.isEnabled(DebugAlarmOverride.EXACT_ALARM_DENIED)) return false
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         return alarmManager.canScheduleExactAlarms()
     }
 
     private fun blockedAlarmNotificationChannel(settings: UserSettings): String? {
+        if (debugOverrides.isEnabled(DebugAlarmOverride.CHANNEL_BLOCKED)) {
+            return "debug_blocked_channel"
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -186,6 +198,7 @@ class AlarmReadinessService(
     }
 
     private fun canUseFullScreenIntent(): Boolean {
+        if (debugOverrides.isEnabled(DebugAlarmOverride.FULL_SCREEN_INTENT_DENIED)) return false
         if (!usesFullScreenAlarmUi) return true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val notificationManager =

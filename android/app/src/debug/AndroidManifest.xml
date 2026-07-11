@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name=".alarm.debug.DebugAlarmTestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.bfalls.suntimealerts.debug.SET_OVERRIDE" />
+                <action android:name="com.bfalls.suntimealerts.debug.CLEAR_OVERRIDES" />
+                <action android:name="com.bfalls.suntimealerts.debug.RECONCILE_BOOT" />
+                <action android:name="com.bfalls.suntimealerts.debug.RECONCILE_TIMEZONE" />
+                <action android:name="com.bfalls.suntimealerts.debug.SIMULATE_APP_RESUME" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

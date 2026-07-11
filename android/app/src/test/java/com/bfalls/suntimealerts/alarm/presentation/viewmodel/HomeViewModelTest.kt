@@ -178,6 +178,57 @@ class HomeViewModelTest {
         assertEquals(true, settingsRepo.load().onboardingComplete)
     }
 
+    @Test
+    fun postOnboardingLocationRegressionLeavesReadinessDegraded() = runTest {
+        val fixedCoordinate = Coordinate(12.34, 56.78)
+        val settings = UserSettings(
+            locationMode = LocationMode.FIXED,
+            fixedLocation = fixedCoordinate,
+            sunriseConfig = SunAlarmConfig(enabled = true, eventType = SunEventType.SUNRISE, offsetMinutes = 0),
+            sunsetConfig = SunAlarmConfig(enabled = false, eventType = SunEventType.SUNSET, offsetMinutes = 0),
+            timeFormat24h = true,
+            onboardingComplete = true,
+            alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Morning",
+                    enabled = true
+                )
+            )
+        )
+        val settingsRepo = FakeSettingsRepository(settings, settings.alarms)
+        val readinessProvider = FakeAlarmReadinessProvider(
+            current = AlarmReadiness(
+                locationReady = false,
+                notificationsReady = true,
+                notificationChannelReady = true,
+                blockedNotificationChannelId = null,
+                exactAlarmReady = true,
+                fullScreenIntentReady = true,
+                bootRescheduleReady = false,
+                canDeliverReliableAlerts = false,
+                missingCapabilities = listOf(
+                    com.bfalls.suntimealerts.alarm.services.AlarmReadinessIssue.LOCATION,
+                    com.bfalls.suntimealerts.alarm.services.AlarmReadinessIssue.BOOT_RESCHEDULE
+                ),
+                repairActions = listOf(com.bfalls.suntimealerts.alarm.services.AlarmRepairAction.SELECT_LOCATION)
+            )
+        )
+        val viewModel = HomeViewModel(
+            RecordingLocationProvider(),
+            settingsRepo,
+            RecordingScheduler(),
+            SunTimesCalculator(),
+            readinessProvider
+        )
+
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.alarmReadiness?.canDeliverReliableAlerts ?: true)
+        assertEquals(true, settingsRepo.load().onboardingComplete)
+    }
+
     private class FakeSettingsRepository(
         private var settings: UserSettings,
         private var alarms: List<SunAlarm>
@@ -233,9 +284,10 @@ class HomeViewModelTest {
     )
 
     private class FakeAlarmReadinessProvider(
-        exactAlarmReady: Boolean = true
+        exactAlarmReady: Boolean = true,
+        current: AlarmReadiness? = null
     ) : AlarmReadinessProvider {
-        var current: AlarmReadiness = AlarmReadiness(
+        var current: AlarmReadiness = current ?: AlarmReadiness(
             locationReady = true,
             notificationsReady = true,
             notificationChannelReady = true,

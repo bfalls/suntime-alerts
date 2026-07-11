@@ -1,0 +1,55 @@
+# Android Debug Testing
+
+These hooks are debug-only. They are available in debug builds through the `DebugAlarmTestReceiver` and are not registered in release builds.
+
+Package name used below:
+
+```text
+com.bfalls.suntimealerts
+```
+
+Set or clear a simulated readiness or permission state:
+
+```text
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override location_permission_denied --ez enabled true
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override location_unavailable --ez enabled true
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override notification_permission_denied --ez enabled true
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override app_notifications_disabled --ez enabled true
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override channel_blocked --ez enabled true
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override exact_alarm_denied --ez enabled true
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override full_screen_intent_denied --ez enabled true
+```
+
+Clear all overrides:
+
+```text
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.CLEAR_OVERRIDES
+```
+
+Trigger reconcile paths:
+
+```text
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.RECONCILE_BOOT
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.RECONCILE_TIMEZONE
+```
+
+Simulate returning to the app from system settings so readiness is refreshed:
+
+```text
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SIMULATE_APP_RESUME
+```
+
+Suggested real-device loop:
+
+```text
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.CLEAR_OVERRIDES
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SET_OVERRIDE --es override exact_alarm_denied --ez enabled true
+adb shell am broadcast -a com.bfalls.suntimealerts.debug.SIMULATE_APP_RESUME
+```
+
+Then verify:
+
+- Home shows the repair banner
+- Settings shows the matching repair action
+- Scheduling is skipped when exact alarms are denied
+- Reconcile behavior is deterministic when boot or timezone actions are triggered
