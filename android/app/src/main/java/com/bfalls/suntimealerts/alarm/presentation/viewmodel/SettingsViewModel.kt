@@ -12,6 +12,8 @@ import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
 import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.presentation.ui.LocationPickerUiState
+import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
+import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.cities.data.City
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.utils.hasLocationPermission
@@ -26,6 +28,7 @@ data class SettingsUiState(
     val locationState: LocationPickerUiState = LocationPickerUiState(),
     val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
     val appThemeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val alarmReadiness: AlarmReadiness? = null,
     val isSavingLocation: Boolean = false,
     val errorMessage: String? = null
 )
@@ -34,7 +37,8 @@ class SettingsViewModel(
     private val settingsStore: SettingsRepository,
     private val cityRepository: CityRepository,
     private val locationService: LocationProvider,
-    private val applicationContext: Context
+    private val applicationContext: Context,
+    private val alarmReadinessProvider: AlarmReadinessProvider
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -63,7 +67,8 @@ class SettingsViewModel(
                 selectedCity = null
             ),
             skyBodySize = settings.skyBodySize,
-            appThemeMode = settings.appThemeMode
+            appThemeMode = settings.appThemeMode,
+            alarmReadiness = alarmReadinessProvider.readiness()
         )
         if (settings.locationMode == LocationMode.DEVICE && !locationPermissionMissing) {
             refreshDeviceNearestCity()
@@ -96,6 +101,7 @@ class SettingsViewModel(
         if (granted && _state.value.locationState.locationMode == LocationMode.DEVICE) {
             refreshDeviceNearestCity()
         }
+        refreshReadiness()
     }
 
     fun updateCityQuery(query: String) {
@@ -173,7 +179,12 @@ class SettingsViewModel(
                 val loaded = settingsStore.load()
                 val updated = applyLocationToSettings(currentState.locationState, loaded)
                 settingsStore.save(updated)
-                _state.update { it.copy(isSavingLocation = false) }
+                _state.update {
+                    it.copy(
+                        isSavingLocation = false,
+                        alarmReadiness = alarmReadinessProvider.readiness()
+                    )
+                }
                 onSaved()
             } catch (t: Throwable) {
                 _state.update { it.copy(isSavingLocation = false, errorMessage = "Failed to save location") }
@@ -202,6 +213,14 @@ class SettingsViewModel(
         _state.update { it.copy(errorMessage = null) }
     }
 
+    fun refreshReadiness() {
+        viewModelScope.launch {
+            _state.update { current ->
+                current.copy(alarmReadiness = alarmReadinessProvider.readiness())
+            }
+        }
+    }
+
     private fun applyLocationToSettings(
         locationState: LocationPickerUiState,
         settings: UserSettings
@@ -224,12 +243,19 @@ class SettingsViewModelFactory(
     private val settingsStore: SettingsRepository,
     private val cityRepository: CityRepository,
     private val locationService: LocationProvider,
-    private val applicationContext: Context
+    private val applicationContext: Context,
+    private val alarmReadinessProvider: AlarmReadinessProvider
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(settingsStore, cityRepository, locationService, applicationContext) as T
+            return SettingsViewModel(
+                settingsStore,
+                cityRepository,
+                locationService,
+                applicationContext,
+                alarmReadinessProvider
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

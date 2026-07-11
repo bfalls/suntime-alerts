@@ -266,12 +266,7 @@ class OnboardingViewModel(
                         )
             } else current.deviceNearestCityLabel != null
 
-            OnboardingStep.SUMMARY -> current.alarmReadiness?.let { readiness ->
-                readiness.locationReady &&
-                    readiness.notificationsReady &&
-                    readiness.notificationChannelReady &&
-                    readiness.exactAlarmReady
-            } ?: false
+            OnboardingStep.SUMMARY -> current.isLoaded
 
             else -> true
         }
@@ -279,15 +274,7 @@ class OnboardingViewModel(
 
     fun complete(onFinished: () -> Unit) {
         viewModelScope.launch {
-            val readiness = refreshReadinessInternal()
-            if (
-                !readiness.locationReady ||
-                !readiness.notificationsReady ||
-                !readiness.notificationChannelReady ||
-                !readiness.exactAlarmReady
-            ) {
-                return@launch
-            }
+            refreshReadinessInternal()
             var settings = settingsStore.load()
             val onboardingState = _state.value
             settings = settings.copy(

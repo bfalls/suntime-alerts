@@ -295,18 +295,21 @@ private fun ReadinessSummary(state: OnboardingState) {
         return
     }
 
-    val requiredReady = readiness.locationReady &&
-        readiness.notificationsReady &&
-        readiness.notificationChannelReady &&
-        readiness.exactAlarmReady
     CapabilityCard(
-        title = "Ready to start",
-        ready = requiredReady,
-        reason = "Setup can finish only after required alert capabilities are ready.",
-        action = if (requiredReady) {
-            "Save & Start is enabled."
+        title = "Setup complete",
+        ready = true,
+        reason = "Finishing onboarding saves your first-run choices. Alert readiness can change later and is repaired from Home or Settings.",
+        action = "Save & Start is enabled.",
+        fallback = null
+    )
+    CapabilityCard(
+        title = "Alerts ready now",
+        ready = readiness.canDeliverReliableAlerts,
+        reason = "This reflects whether sunrise and sunset alerts can fire reliably right now.",
+        action = if (readiness.canDeliverReliableAlerts) {
+            "Alerts are ready."
         } else {
-            "Go back and repair: ${readiness.missingCapabilities.joinToString { it.label() }}"
+            "You can finish setup now and repair later: ${readiness.missingCapabilities.joinToString { it.label() }}"
         },
         fallback = null
     )

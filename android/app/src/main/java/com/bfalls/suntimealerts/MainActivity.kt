@@ -100,7 +100,13 @@ class MainActivity : ComponentActivity() {
                 )
             }
             val settingsViewModel: SettingsViewModel = viewModel(
-                factory = SettingsViewModelFactory(settingsStore, cityRepository, locationService, applicationContext)
+                factory = SettingsViewModelFactory(
+                    settingsStore,
+                    cityRepository,
+                    locationService,
+                    applicationContext,
+                    alarmReadinessService
+                )
             )
             val onboardingViewModel: OnboardingViewModel = viewModel(
                 factory = OnboardingViewModelFactory(

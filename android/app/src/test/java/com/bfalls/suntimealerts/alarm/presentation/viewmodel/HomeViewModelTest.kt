@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -140,6 +141,41 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf(fixedCoordinate), scheduler.receivedCoordinates)
+    }
+
+    @Test
+    fun postOnboardingPermissionRevocationLeavesOnboardingDoneButReadinessDegraded() = runTest {
+        val fixedCoordinate = Coordinate(12.34, 56.78)
+        val settings = UserSettings(
+            locationMode = LocationMode.FIXED,
+            fixedLocation = fixedCoordinate,
+            sunriseConfig = SunAlarmConfig(enabled = true, eventType = SunEventType.SUNRISE, offsetMinutes = 0),
+            sunsetConfig = SunAlarmConfig(enabled = false, eventType = SunEventType.SUNSET, offsetMinutes = 0),
+            timeFormat24h = true,
+            onboardingComplete = true,
+            alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "Morning",
+                    enabled = true
+                )
+            )
+        )
+        val settingsRepo = FakeSettingsRepository(settings, settings.alarms)
+        val readinessProvider = FakeAlarmReadinessProvider(exactAlarmReady = false)
+        val viewModel = HomeViewModel(
+            RecordingLocationProvider(),
+            settingsRepo,
+            RecordingScheduler(),
+            SunTimesCalculator(),
+            readinessProvider
+        )
+
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.alarmReadiness?.canDeliverReliableAlerts ?: true)
+        assertEquals(true, settingsRepo.load().onboardingComplete)
     }
 
     private class FakeSettingsRepository(

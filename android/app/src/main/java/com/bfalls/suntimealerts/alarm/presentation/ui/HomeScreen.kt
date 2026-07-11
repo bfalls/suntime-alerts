@@ -285,6 +285,7 @@ fun HomeScreenContent(
                     item {
                         AlarmReadinessBanner(
                             state = state,
+                            onOpenSettings = onOpenSettings,
                             onOpenNotificationSettings = onOpenNotificationSettings,
                             onOpenNotificationChannelSettings = onOpenNotificationChannelSettings,
                             onOpenExactAlarmSettings = onOpenExactAlarmSettings,
@@ -370,6 +371,7 @@ fun HomeScreenContent(
 @Composable
 private fun AlarmReadinessBanner(
     state: HomeViewModel.State,
+    onOpenSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenNotificationChannelSettings: (String?) -> Unit,
     onOpenExactAlarmSettings: () -> Unit,
@@ -377,10 +379,7 @@ private fun AlarmReadinessBanner(
 ) {
     val readiness = state.alarmReadiness ?: return
     val needsRepair =
-        !readiness.notificationsReady ||
-            !readiness.notificationChannelReady ||
-            !readiness.exactAlarmReady ||
-            !readiness.fullScreenIntentReady
+        !readiness.canDeliverReliableAlerts || !readiness.fullScreenIntentReady
     if (!needsRepair) return
 
     Surface(
@@ -401,6 +400,10 @@ private fun AlarmReadinessBanner(
             )
             Text(
                 text = when {
+                    !readiness.locationReady ->
+                        "Location data is unavailable, so sunrise and sunset alerts cannot be calculated reliably right now."
+                    !readiness.bootRescheduleReady ->
+                        "Alarm recovery after device restart is degraded until a usable location is saved."
                     !readiness.fullScreenIntentReady ->
                         "Full-screen alarm pop-ups are disabled, so alarms will fall back to a high-priority notification instead of opening over the lock screen."
                     !readiness.exactAlarmReady ->
@@ -416,6 +419,11 @@ private fun AlarmReadinessBanner(
                 if (readiness.repairActions.contains(AlarmRepairAction.REQUEST_EXACT_ALARM_PERMISSION)) {
                     Button(onClick = onOpenExactAlarmSettings) {
                         Text("Alarms & reminders")
+                    }
+                }
+                if (readiness.repairActions.contains(AlarmRepairAction.REQUEST_LOCATION_PERMISSION)) {
+                    Button(onClick = onOpenSettings) {
+                        Text("Location")
                     }
                 }
                 if (readiness.repairActions.contains(AlarmRepairAction.OPEN_FULL_SCREEN_INTENT_SETTINGS)) {

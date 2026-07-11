@@ -50,6 +50,7 @@ import androidx.core.content.getSystemService
 import com.bfalls.suntimealerts.alarm.domain.model.AppThemeMode
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.SettingsViewModel
+import com.bfalls.suntimealerts.alarm.services.AlarmRepairAction
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import com.bfalls.suntimealerts.utils.hasNotificationPermission
 import kotlinx.coroutines.launch
@@ -82,6 +83,10 @@ fun SettingsScreen(
 
     LaunchedEffect(hasLocationPermission) {
         viewModel.updateLocationPermission(hasLocationPermission)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshReadiness()
     }
 
     LaunchedEffect(state.errorMessage) {
@@ -319,6 +324,78 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(label)
+                            }
+                        }
+                    }
+                }
+
+                state.alarmReadiness?.let { readiness ->
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (readiness.canDeliverReliableAlerts) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.errorContainer
+                            }
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("Alerts readiness", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (readiness.canDeliverReliableAlerts) {
+                                    "Alerts are ready right now."
+                                } else {
+                                    "Alerts are degraded right now. Repair the missing capabilities below."
+                                }
+                            )
+                            readiness.repairActions.forEach { action ->
+                                when (action) {
+                                    AlarmRepairAction.REQUEST_LOCATION_PERMISSION -> Button(onClick = {
+                                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                        context.startActivity(intent)
+                                    }) { Text("Open location settings") }
+                                    AlarmRepairAction.SELECT_LOCATION -> Button(onClick = {}) {
+                                        Text("Review location above")
+                                    }
+                                    AlarmRepairAction.REQUEST_NOTIFICATION_PERMISSION,
+                                    AlarmRepairAction.OPEN_NOTIFICATION_SETTINGS -> Button(onClick = {
+                                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        }
+                                        context.startActivity(intent)
+                                    }) { Text("Open notification settings") }
+                                    AlarmRepairAction.OPEN_NOTIFICATION_CHANNEL_SETTINGS -> Button(onClick = {
+                                        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                            putExtra(Settings.EXTRA_CHANNEL_ID, readiness.blockedNotificationChannelId)
+                                        }
+                                        context.startActivity(intent)
+                                    }) { Text("Open channel settings") }
+                                    AlarmRepairAction.REQUEST_EXACT_ALARM_PERMISSION -> Button(onClick = {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                        }
+                                    }) { Text("Open Alarms & reminders") }
+                                    AlarmRepairAction.OPEN_FULL_SCREEN_INTENT_SETTINGS -> Button(onClick = {
+                                        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                                data = Uri.parse("package:${context.packageName}")
+                                            }
+                                        } else {
+                                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                data = Uri.parse("package:${context.packageName}")
+                                            }
+                                        }
+                                        context.startActivity(intent)
+                                    }) { Text("Open full-screen alarm settings") }
+                                }
                             }
                         }
                     }

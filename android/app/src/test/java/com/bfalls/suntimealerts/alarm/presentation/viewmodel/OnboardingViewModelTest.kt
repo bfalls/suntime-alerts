@@ -201,7 +201,7 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun completeDoesNotFinishWhenRequiredReadinessIsMissing() = runTest {
+    fun completeFinishesEvenWhenAlertsAreNotReady() = runTest {
         val readinessProvider = FakeAlarmReadinessProvider(
             readiness(exactAlarmReady = false)
         )
@@ -212,8 +212,8 @@ class OnboardingViewModelTest {
         viewModel.complete { finished = true }
         advanceUntilIdle()
 
-        assertEquals(false, finished)
-        assertEquals(false, viewModel.state.value.onboardingComplete)
+        assertEquals(true, finished)
+        assertEquals(true, viewModel.state.value.onboardingComplete)
     }
 
     @Test
