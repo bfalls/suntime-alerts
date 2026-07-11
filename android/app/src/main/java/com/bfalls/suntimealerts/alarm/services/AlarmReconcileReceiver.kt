@@ -1,5 +1,6 @@
 package com.bfalls.suntimealerts.alarm.services
 
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -16,7 +17,12 @@ class AlarmReconcileReceiver : BroadcastReceiver() {
             try {
                 val reason = action ?: "unknown"
                 Log.i("AlarmReconcileReceiver", "Received $reason; reconciling alarms.")
-                AlarmReconciler(context.applicationContext).reconcile(reason)
+                val reconciler = AlarmReconciler(context.applicationContext)
+                if (action == AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) {
+                    reconciler.reconcileAfterExactAlarmGrant(reason)
+                } else {
+                    reconciler.reconcile(reason)
+                }
             } catch (t: Throwable) {
                 Log.e("AlarmReconcileReceiver", "Failed to reconcile alarms on $action", t)
             } finally {

@@ -66,6 +66,53 @@ class AlarmReconcilerTest {
         assertEquals(persistedCoordinate, scheduler.coordinate)
     }
 
+    @Test
+    fun exactAlarmGrantReconcileSkipsWhenAccessIsStillDenied() = runTest {
+        val scheduler = RecordingScheduler()
+        val reconciler = AlarmReconciler(
+            context = ContextWrapper(null),
+            settingsStore = FakeSettingsRepository(
+                settings = baseSettings(
+                    locationMode = LocationMode.FIXED,
+                    fixedLocation = Coordinate(39.7392, -104.9903),
+                    lastResolvedDeviceLocation = null
+                )
+            ),
+            locationProvider = FakeLocationProvider(null),
+            scheduleService = scheduler,
+            zoneId = ZoneId.of("UTC"),
+            canScheduleExactAlarms = { false }
+        )
+
+        reconciler.reconcileAfterExactAlarmGrant("android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED")
+
+        assertNull(scheduler.coordinate)
+    }
+
+    @Test
+    fun exactAlarmGrantReconcileSchedulesWhenAccessIsGranted() = runTest {
+        val fixedCoordinate = Coordinate(39.7392, -104.9903)
+        val scheduler = RecordingScheduler()
+        val reconciler = AlarmReconciler(
+            context = ContextWrapper(null),
+            settingsStore = FakeSettingsRepository(
+                settings = baseSettings(
+                    locationMode = LocationMode.FIXED,
+                    fixedLocation = fixedCoordinate,
+                    lastResolvedDeviceLocation = null
+                )
+            ),
+            locationProvider = FakeLocationProvider(null),
+            scheduleService = scheduler,
+            zoneId = ZoneId.of("UTC"),
+            canScheduleExactAlarms = { true }
+        )
+
+        reconciler.reconcileAfterExactAlarmGrant("android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED")
+
+        assertEquals(fixedCoordinate, scheduler.coordinate)
+    }
+
     private fun baseSettings(
         locationMode: LocationMode,
         fixedLocation: Coordinate?,
