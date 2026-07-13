@@ -1,5 +1,6 @@
 package com.bfalls.suntimealerts.alarm.domain.service
 
+import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import java.time.Duration
 import java.time.ZonedDateTime
 import kotlin.math.PI
@@ -26,11 +27,17 @@ object SunArcPositionCalculator {
         width: Float,
         horizonY: Float,
         arcHeight: Float,
-        horizontalPadding: Float
+        horizontalPadding: Float,
+        skyFacingMode: SkyFacingMode = SkyFacingMode.SOUTH_FACING
     ): SunXY {
         val clamped = t.coerceIn(0.0, 1.0)
         val isDay = t in 0.0..1.0
-        val x = lerp(horizontalPadding, width - horizontalPadding, clamped.toFloat())
+        val x = when (skyFacingMode) {
+            SkyFacingMode.SOUTH_FACING ->
+                lerp(horizontalPadding, width - horizontalPadding, clamped.toFloat())
+            SkyFacingMode.NORTH_FACING ->
+                lerp(width - horizontalPadding, horizontalPadding, clamped.toFloat())
+        }
         val y = if (isDay) {
             horizonY - arcHeight * sin(PI * clamped).toFloat()
         } else {

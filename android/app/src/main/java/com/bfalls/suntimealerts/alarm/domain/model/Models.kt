@@ -32,6 +32,11 @@ enum class SkyBodySize {
     LARGE
 }
 
+enum class SkyFacingMode {
+    SOUTH_FACING,
+    NORTH_FACING
+}
+
 data class UserSettings(
     val locationMode: LocationMode,
     val fixedLocation: Coordinate? = null,

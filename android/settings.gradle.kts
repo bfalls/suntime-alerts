@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Suntime Alerts"
 include(":app")
+include(":sky-banner-lab")
