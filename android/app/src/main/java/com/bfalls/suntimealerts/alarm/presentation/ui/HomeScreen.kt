@@ -86,12 +86,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -112,6 +115,7 @@ import android.text.format.DateFormat
 import com.bfalls.suntimealerts.R
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
+import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
@@ -1115,6 +1119,7 @@ private fun SkyAppBarBackground(
     skyBodySize: SkyBodySize,
     modifier: Modifier = Modifier
 ) {
+    val skyFacingMode = SkyFacingMode.SOUTH_FACING
     val hasSunTimes = sunTimesResolved && sunrise != null && sunset != null
     val moonWindowComplete = coordinateUsed != null && moonRise != null && moonSet != null && moonRise.isBefore(moonSet)
     val moonIsAboveHorizon = moonWindowComplete && !now.isBefore(moonRise) && !now.isAfter(moonSet)
@@ -1147,7 +1152,8 @@ private fun SkyAppBarBackground(
             width = size.width,
             horizonY = horizonY,
             arcHeight = sunArcHeight,
-            horizontalPadding = size.width * 0.1f
+            horizontalPadding = size.width * 0.1f,
+            skyFacingMode = skyFacingMode
         )
         val moonPosition: MoonXY = if (moonWindowComplete) {
             MoonArcPositionCalculator.computeMoonXY(
@@ -1157,7 +1163,8 @@ private fun SkyAppBarBackground(
                 width = size.width,
                 horizonY = horizonY,
                 arcHeight = moonArcHeight,
-                horizontalPadding = size.width * 0.1f
+                horizontalPadding = size.width * 0.1f,
+                skyFacingMode = skyFacingMode
             )
         } else {
             MoonArcPositionCalculator.computeMoonXY(
@@ -1167,7 +1174,8 @@ private fun SkyAppBarBackground(
                 width = size.width,
                 horizonY = horizonY,
                 arcHeight = moonArcHeight,
-                horizontalPadding = size.width * 0.1f
+                horizontalPadding = size.width * 0.1f,
+                skyFacingMode = skyFacingMode
             )
         }
         val isDay = sunPosition.isDay && hasSunTimes
@@ -1221,48 +1229,14 @@ private fun SkyAppBarBackground(
             val moonRadius = moonDiameter / 2f
             val topLeft = Offset(moonPosition.x - moonRadius, moonPosition.y - moonRadius)
             val moonAlpha = if (isDay) 0.65f else 0.95f
-            drawImage(
-                image = moonImage,
-                dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt()),
-                dstSize = IntSize(moonDiameter.roundToInt(), moonDiameter.roundToInt()),
-                alpha = moonAlpha
+            drawMoonPhase(
+                moonImage = moonImage,
+                topLeft = topLeft,
+                diameter = moonDiameter,
+                alpha = moonAlpha,
+                illumination01 = moonIllumination01.toFloat(),
+                isWaxing = moonIsWaxing
             )
-
-            val darkness = (1f - moonIllumination01.toFloat().coerceIn(0f, 1f)).coerceIn(0f, 1f)
-            if (darkness > 0f) {
-                val circlePath = Path().apply {
-                    addOval(Rect(topLeft, Size(moonDiameter, moonDiameter)))
-                }
-                val direction = if (moonIsWaxing) 1f else -1f
-                val phaseShift = (0.5f - moonIllumination01.toFloat()).coerceIn(-0.5f, 0.5f)
-                val gradientStart = Offset(
-                    x = moonPosition.x - direction * moonRadius * (1f + phaseShift),
-                    y = moonPosition.y - moonRadius
-                )
-                val gradientEnd = Offset(
-                    x = moonPosition.x + direction * moonRadius * (1f - phaseShift),
-                    y = moonPosition.y + moonRadius
-                )
-                val overlayAlpha = 0.85f * (0.3f + 0.7f * darkness)
-                val gradient = Brush.linearGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = overlayAlpha),
-                        Color.Black.copy(alpha = overlayAlpha * 0.35f),
-                        Color.Transparent
-                    ),
-                    start = gradientStart,
-                    end = gradientEnd,
-                    tileMode = TileMode.Clamp
-                )
-                clipPath(circlePath) {
-                    drawRect(
-                        brush = gradient,
-                        topLeft = Offset(moonPosition.x - moonRadius, moonPosition.y - moonRadius),
-                        size = Size(moonDiameter, moonDiameter),
-                        alpha = moonAlpha
-                    )
-                }
-            }
         }
 
         if (isDay) {
@@ -1278,6 +1252,106 @@ private fun SkyAppBarBackground(
                 dstSize = IntSize(sunDiameter.roundToInt(), sunDiameter.roundToInt())
             )
         }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMoonPhase(
+    moonImage: ImageBitmap,
+    topLeft: Offset,
+    diameter: Float,
+    alpha: Float,
+    illumination01: Float,
+    isWaxing: Boolean
+) {
+    val circleRect = Rect(topLeft, Size(diameter, diameter))
+    val circlePath = Path().apply { addOval(circleRect) }
+    val litPath = buildMoonLitPath(
+        bounds = circleRect,
+        illumination01 = illumination01.coerceIn(0f, 1f),
+        isWaxing = isWaxing
+    )
+
+    clipPath(circlePath) {
+        drawImage(
+            image = moonImage,
+            dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt()),
+            dstSize = IntSize(diameter.roundToInt(), diameter.roundToInt()),
+            alpha = alpha * 0.28f
+        )
+        drawRect(
+            color = Color.Black.copy(alpha = 0.45f * alpha),
+            topLeft = topLeft,
+            size = Size(diameter, diameter)
+        )
+        clipPath(litPath) {
+            drawImage(
+                image = moonImage,
+                dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt()),
+                dstSize = IntSize(diameter.roundToInt(), diameter.roundToInt()),
+                alpha = alpha
+            )
+        }
+        drawIntoCanvas { canvas ->
+            canvas.saveLayer(circleRect, androidx.compose.ui.graphics.Paint())
+            drawPath(
+                path = litPath,
+                color = Color.White.copy(alpha = 0.12f * alpha)
+            )
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.10f * alpha),
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.12f * alpha)
+                    ),
+                    startY = topLeft.y,
+                    endY = topLeft.y + diameter
+                ),
+                topLeft = topLeft,
+                size = Size(diameter, diameter),
+                blendMode = BlendMode.Modulate
+            )
+            canvas.restore()
+        }
+    }
+}
+
+private fun buildMoonLitPath(
+    bounds: Rect,
+    illumination01: Float,
+    isWaxing: Boolean
+): Path {
+    val radius = bounds.width / 2f
+    val centerX = bounds.center.x
+    val centerY = bounds.center.y
+    val phaseDelta = (illumination01 - 0.5f) * 2f
+    val ovalWidth = (radius * 2f * abs(phaseDelta)).coerceAtLeast(0.001f)
+    val ovalRect = Rect(
+        left = centerX - ovalWidth / 2f,
+        top = bounds.top,
+        right = centerX + ovalWidth / 2f,
+        bottom = bounds.bottom
+    )
+    val fullDisc = Path().apply { addOval(bounds) }
+    val halfDisc = Path().apply {
+        addRect(
+            Rect(
+                left = if (isWaxing) centerX else bounds.left,
+                top = bounds.top,
+                right = if (isWaxing) bounds.right else centerX,
+                bottom = bounds.bottom
+            )
+        )
+        addOval(bounds)
+    }
+    val halfMoon = Path.combine(PathOperation.Intersect, fullDisc, halfDisc)
+    val phaseOval = Path().apply { addOval(ovalRect) }
+
+    return when {
+        illumination01 <= 0f -> Path()
+        illumination01 >= 1f -> fullDisc
+        illumination01 < 0.5f -> Path.combine(PathOperation.Difference, halfMoon, phaseOval)
+        else -> Path.combine(PathOperation.Union, halfMoon, phaseOval)
     }
 }
 

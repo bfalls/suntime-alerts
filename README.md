@@ -32,6 +32,7 @@ Suntime Alerts is a dual-native mobile app (iOS + Android) that schedules alarms
 3. Run the `app` configuration on an API 26+ emulator or device.
 4. The Gradle wrapper JAR is checked in. If you need to regenerate it, use `./gradlew wrapper --gradle-version 8.13`.
 5. For permission and readiness verification, prefer real devices over emulators. See `android/DEBUG_TESTING.md`.
+6. For manual sky-banner preview on Windows, run `tools/run-sky-banner-lab.bat` or `.\gradlew.bat :sky-banner-lab:run` from `android/`. This launches a desktop utility that reuses the Android app's existing sun/moon calculation code and banner assets so you can inspect future dates, times, time zones, and coordinates without rebuilding the mobile UI.
 
 ## Development principles
 - Shared domain concepts: `SunEventType`, `SunEvent`, `SunAlarmConfig`, `UserSettings`.
@@ -81,7 +82,13 @@ Suggested split:
 - Instrumentation UI tests: deterministic Compose state assertions and debug-hook driven flows
 - Unit tests: readiness evaluator, reconcile logic, scheduling gates
 - Manual physical-device pass before release: every permission and settings regression path
+- Desktop banner preview: use `android/sky-banner-lab` for manual inspection of sun/moon banner behavior across arbitrary future timestamps and coordinates on Windows
 
 See `android/DEBUG_TESTING.md` for the debug broadcast commands used during real-device runs.
+
+Note on platform separation:
+
+- The desktop sky-banner lab reuses the Android Kotlin calculation code directly and is intended for Android-side manual verification.
+- iOS should keep its own native implementation and any equivalent preview tooling separate, even if it follows the same astronomical rules and visual behavior.
 
 See [DESIGN.md](DESIGN.md) for detailed flows, algorithms, and extension notes.

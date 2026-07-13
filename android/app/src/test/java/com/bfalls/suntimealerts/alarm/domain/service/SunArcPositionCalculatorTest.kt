@@ -1,5 +1,6 @@
 package com.bfalls.suntimealerts.alarm.domain.service
 
+import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -63,5 +64,28 @@ class SunArcPositionCalculatorTest {
 
         assertFalse(position.isDay)
         assertTrue(position.y > 180f)
+    }
+
+    @Test
+    fun northFacingModeMirrorsHorizontalArc() {
+        val southFacing = SunArcPositionCalculator.computeSunXY(
+            t = 0.25,
+            width = 400f,
+            horizonY = 200f,
+            arcHeight = 80f,
+            horizontalPadding = 20f,
+            skyFacingMode = SkyFacingMode.SOUTH_FACING
+        )
+        val northFacing = SunArcPositionCalculator.computeSunXY(
+            t = 0.25,
+            width = 400f,
+            horizonY = 200f,
+            arcHeight = 80f,
+            horizontalPadding = 20f,
+            skyFacingMode = SkyFacingMode.NORTH_FACING
+        )
+
+        assertEquals(400f, southFacing.x + northFacing.x, 0.5f)
+        assertEquals(southFacing.y, northFacing.y, 0.01f)
     }
 }
