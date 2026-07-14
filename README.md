@@ -5,6 +5,8 @@ Suntime Alerts is a dual-native mobile app (iOS + Android) that schedules alarms
 ## Repository layout
 - `README.md`: Overview and quickstart for both platforms.
 - `DESIGN.md`: Architecture and product design reference.
+- `PLAY_CLOSED_TESTING_CHECKLIST.md`: Android alpha rollout checklist for Google Play closed testing.
+- `PRIVACY.md`: Privacy notice for the repo and current alpha app behavior.
 - `ios/`: Native Swift/SwiftUI app using MVVM and clean layering.
 - `android/`: Native Kotlin/Jetpack Compose app using MVVM, coroutines, and WorkManager/AlarmManager.
 - `.github/workflows/`: Continuous integration skeletons.
@@ -33,6 +35,8 @@ Suntime Alerts is a dual-native mobile app (iOS + Android) that schedules alarms
 4. The Gradle wrapper JAR is checked in. If you need to regenerate it, use `./gradlew wrapper --gradle-version 8.13`.
 5. For permission and readiness verification, prefer real devices over emulators. See `android/DEBUG_TESTING.md`.
 6. For manual sky-banner preview on Windows, run `tools/run-sky-banner-lab.bat` or `.\gradlew.bat :sky-banner-lab:run` from `android/`. This launches a desktop utility that reuses the Android app's existing sun/moon calculation code and banner assets so you can inspect future dates, times, time zones, and coordinates without rebuilding the mobile UI.
+7. For alpha distribution planning, see `PLAY_CLOSED_TESTING_CHECKLIST.md`.
+8. For current privacy expectations, see `PRIVACY.md`.
 
 ## Development principles
 - Shared domain concepts: `SunEventType`, `SunEvent`, `SunAlarmConfig`, `UserSettings`.

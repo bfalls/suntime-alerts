@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PKG="com.bfalls.suntimealerts"
+ADB_SERIAL="${ADB_SERIAL:-${ANDROID_SERIAL:-}}"
 
 resolve_adb() {
   normalize_path() {
@@ -54,12 +55,49 @@ resolve_adb() {
   return 1
 }
 
+list_device_serials() {
+  "$ADB" devices | awk 'NR>1 && $2 == "device" { print $1 }'
+}
+
+resolve_target_args() {
+  if [[ -n "$ADB_SERIAL" ]]; then
+    printf '%s\n' "-s" "$ADB_SERIAL"
+    return 0
+  fi
+
+  mapfile -t devices < <(list_device_serials)
+
+  if [[ "${#devices[@]}" -eq 0 ]]; then
+    echo "No connected adb devices were found." >&2
+    return 1
+  fi
+
+  if [[ "${#devices[@]}" -gt 1 ]]; then
+    echo "More than one adb device/emulator is connected:" >&2
+    printf '  %s\n' "${devices[@]}" >&2
+    echo "Set ADB_SERIAL or ANDROID_SERIAL, or run: ./scripts/reset-app.sh <serial>" >&2
+    return 1
+  fi
+
+  printf '%s\n' "-s" "${devices[0]}"
+}
+
 ADB="$(resolve_adb)"
+if [[ $# -gt 0 ]]; then
+  if [[ "$1" == "devices" ]]; then
+    "$ADB" devices
+    exit 0
+  fi
+  ADB_SERIAL="$1"
+fi
+mapfile -t TARGET_ARGS < <(resolve_target_args)
+
+echo "Using adb target: ${TARGET_ARGS[1]}"
 
 echo "Clearing app data for $PKG"
-"$ADB" shell pm clear "$PKG"
+"$ADB" "${TARGET_ARGS[@]}" shell pm clear "$PKG"
 
 echo "Force-stopping $PKG"
-"$ADB" shell am force-stop "$PKG"
+"$ADB" "${TARGET_ARGS[@]}" shell am force-stop "$PKG"
 
 echo "Done."

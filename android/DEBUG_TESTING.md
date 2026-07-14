@@ -64,6 +64,17 @@ Real-device verification checklist:
 - Debug boot reconcile and debug timezone reconcile
 - Debug app resume after toggling system settings
 
+Reset script with a specific device:
+
+```text
+./scripts/reset-app.sh devices
+./scripts/reset-app.sh R58NXXXXXXX
+pwsh ./scripts/reset-app.ps1 -DeviceSerial devices
+pwsh ./scripts/reset-app.ps1 -DeviceSerial R58NXXXXXXX
+```
+
+If more than one emulator or device is connected, the reset scripts now require an explicit serial, either by argument or by setting `ADB_SERIAL` / `ANDROID_SERIAL`.
+
 Firebase Test Lab matrix proposal:
 
 - Physical Pixel 5 on API 34

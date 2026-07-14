@@ -19,6 +19,9 @@ data class CityImportProgress(
 )
 
 interface CityLookup {
+    suspend fun ensureCitiesLoaded(
+        onProgress: ((CityImportProgress) -> Unit)? = null
+    )
     suspend fun searchCities(query: String, limit: Int = 20): List<City>
     suspend fun findNearestCity(lat: Double, lon: Double): City?
 }
@@ -31,8 +34,8 @@ class CityRepository(
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val importMutex = Mutex()
 
-    suspend fun ensureCitiesLoaded(
-        onProgress: ((CityImportProgress) -> Unit)? = null
+    override suspend fun ensureCitiesLoaded(
+        onProgress: ((CityImportProgress) -> Unit)?
     ) = withContext(Dispatchers.IO) {
         importMutex.withLock {
             val storedVersion = prefs.getInt(KEY_CITY_DATA_VERSION, 0)
@@ -117,6 +120,7 @@ class CityRepository(
         withContext(Dispatchers.IO) {
             val trimmed = query.trim()
             if (trimmed.length < 2) return@withContext emptyList()
+            ensureCitiesLoaded()
 
             val pattern = "%$trimmed%"
             val db = dbHelper.readableDatabase

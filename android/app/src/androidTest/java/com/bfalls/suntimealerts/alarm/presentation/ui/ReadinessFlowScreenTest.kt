@@ -49,6 +49,7 @@ class ReadinessFlowScreenTest {
                         )
                     ),
                     onLocationModeChanged = {},
+                    onRequestLocationPermission = {},
                     onOpenPermissionSettings = {},
                     onOpenNotificationSettings = {},
                     onOpenNotificationChannelSettings = {},
@@ -95,6 +96,7 @@ class ReadinessFlowScreenTest {
                         )
                     ),
                     onLocationModeChanged = {},
+                    onRequestLocationPermission = {},
                     onOpenPermissionSettings = {},
                     onOpenNotificationSettings = {},
                     onOpenNotificationChannelSettings = {},

@@ -12,17 +12,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,8 +55,6 @@ import com.bfalls.suntimealerts.alarm.services.AlarmReadinessService
 import com.bfalls.suntimealerts.alarm.services.AlarmRepairAction
 import com.bfalls.suntimealerts.alarm.services.NotificationScheduler
 import com.bfalls.suntimealerts.cities.data.CityRepository
-import com.bfalls.suntimealerts.cities.presentation.CityImportViewModel
-import com.bfalls.suntimealerts.cities.presentation.CityImportViewModelFactory
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,9 +64,11 @@ import kotlinx.coroutines.flow.update
 class MainActivity : ComponentActivity() {
     private val settingsStore: SettingsStore by lazy { SettingsStore(applicationContext) }
     private val debugRefreshReadinessTick = MutableStateFlow(0)
+    @Volatile
+    private var keepSplashOnScreen = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        installSplashScreen().setKeepOnScreenCondition { keepSplashOnScreen }
         super.onCreate(savedInstanceState)
         consumeDebugRefreshIntent(intent)
         runBlocking {
@@ -122,10 +117,6 @@ class MainActivity : ComponentActivity() {
             )
             val settingsState by settingsViewModel.state.collectAsState()
             val onboardingState by onboardingViewModel.state.collectAsState()
-            val cityImportViewModel: CityImportViewModel = viewModel(
-                factory = CityImportViewModelFactory(cityRepository)
-            )
-            val cityImportState by cityImportViewModel.state.collectAsState()
             val debugRefreshTick by debugRefreshReadinessTick.collectAsState()
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
@@ -235,33 +226,19 @@ class MainActivity : ComponentActivity() {
                 onboardingState.step,
                 onboardingState.locationMode,
                 onboardingState.deviceNearestCityLabel,
-                onboardingState.locationPermissionPermanentlyDenied,
-                onboardingState.alarmReadiness,
-                permissionRequestOrigin
+                onboardingState.locationPermissionPermanentlyDenied
             ) {
-                // If onboarding is showing the LOCATION step and is in DEVICE mode,
-                // and we don't yet have a nearest-city label, run the permission flow.
                 if (
                     onboardingState.isLoaded &&
                     !onboardingState.onboardingComplete &&
                     onboardingState.step == OnboardingStep.LOCATION &&
                     onboardingState.locationMode == LocationMode.DEVICE &&
                     onboardingState.deviceNearestCityLabel == null &&
-                    permissionRequestOrigin == null &&
                     !onboardingState.locationPermissionPermanentlyDenied
                 ) {
                     if (onboardingState.alarmReadiness?.locationReady == true) {
                         onboardingViewModel.clearLocationPermissionDenial()
                         onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
-                    } else {
-                        autoLocationPermissionRequested = true
-                        permissionRequestOrigin = PermissionRequestOrigin.AUTOMATIC
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
                     }
                 }
             }
@@ -319,6 +296,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            LaunchedEffect(onboardingState.isLoaded) {
+                keepSplashOnScreen = !onboardingState.isLoaded
+            }
+
             val appThemeMode = settingsState.appThemeMode
             val darkTheme = when (appThemeMode) {
                 AppThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -336,30 +317,6 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     when {
-                        cityImportState.isImporting -> Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.background),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "Preparing Suntime Alerts...",
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                CircularProgressIndicator(
-                                    progress = { cityImportState.progress }
-                                )
-                                if (cityImportState.total > 0) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "${cityImportState.current} / ${cityImportState.total}",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
                         !onboardingState.isLoaded -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                         !onboardingState.onboardingComplete -> {
                             OnboardingScreen(
@@ -368,24 +325,29 @@ class MainActivity : ComponentActivity() {
                                     when (mode) {
                                         LocationMode.DEVICE -> {
                                             onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
-
                                             if (onboardingState.alarmReadiness?.locationReady == true) {
                                                 onboardingViewModel.clearLocationPermissionDenial()
-                                                return@OnboardingScreen
                                             }
-
-                                            permissionRequestOrigin = PermissionRequestOrigin.USER
-                                            locationPermissionLauncher.launch(
-                                                arrayOf(
-                                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                                )
-                                            )
                                         }
                                         LocationMode.FIXED -> {
                                             onboardingViewModel.updateLocationMode(LocationMode.FIXED)
                                         }
                                     }
+                                },
+                                onRequestLocationPermission = {
+                                    if (onboardingState.alarmReadiness?.locationReady == true) {
+                                        onboardingViewModel.clearLocationPermissionDenial()
+                                        onboardingViewModel.updateLocationMode(LocationMode.DEVICE)
+                                        return@OnboardingScreen
+                                    }
+
+                                    permissionRequestOrigin = PermissionRequestOrigin.USER
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
                                 },
                                 onOpenPermissionSettings = openAppSettings,
                                 onOpenNotificationSettings = openAppNotificationSettings,
@@ -451,7 +413,12 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNext = onboardingViewModel::nextStep,
                                 onBack = onboardingViewModel::previousStep,
-                                onComplete = { onboardingViewModel.complete { } },
+                                onComplete = {
+                                    onboardingViewModel.complete {
+                                        homeViewModel.refresh()
+                                        settingsViewModel.refreshReadiness()
+                                    }
+                                },
                                 canAdvance = onboardingViewModel.canAdvance()
                             )
                         }

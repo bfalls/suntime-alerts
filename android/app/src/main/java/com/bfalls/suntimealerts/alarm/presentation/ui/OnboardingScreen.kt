@@ -34,6 +34,7 @@ import com.bfalls.suntimealerts.cities.data.City
 fun OnboardingScreen(
     state: OnboardingState,
     onLocationModeChanged: (LocationMode) -> Unit,
+    onRequestLocationPermission: () -> Unit,
     onOpenPermissionSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenNotificationChannelSettings: () -> Unit,
@@ -125,6 +126,7 @@ fun OnboardingScreen(
                     OnboardingStep.LOCATION -> LocationStep(
                         state = state,
                         onLocationModeChanged = onLocationModeChanged,
+                        onRequestLocationPermission = onRequestLocationPermission,
                         onOpenPermissionSettings = onOpenPermissionSettings,
                         onCityQueryChanged = onCityQueryChanged,
                         onCitySelected = onCitySelected
@@ -158,6 +160,7 @@ private fun WelcomeStep() {
 private fun LocationStep(
     state: OnboardingState,
     onLocationModeChanged: (LocationMode) -> Unit,
+    onRequestLocationPermission: () -> Unit,
     onOpenPermissionSettings: () -> Unit,
     onCityQueryChanged: (String) -> Unit,
     onCitySelected: (City) -> Unit
@@ -173,7 +176,7 @@ private fun LocationStep(
                     readiness?.repairActions?.contains(AlarmRepairAction.REQUEST_LOCATION_PERMISSION) == true ->
                     "Allow location or choose Manual."
                 state.locationMode == LocationMode.FIXED -> "Search for and select a city."
-                else -> "Confirm the nearest city."
+                else -> "Confirm the device location."
             },
             fallback = "Manual city selection is supported if device location is unavailable."
         )
@@ -181,16 +184,27 @@ private fun LocationStep(
             state = LocationPickerUiState(
                 locationMode = state.locationMode,
                 locationPermissionPermanentlyDenied = state.locationPermissionPermanentlyDenied,
-                locationPermissionMissing = state.locationPermissionPermanentlyDenied,
+                locationPermissionMissing =
+                    state.locationMode == LocationMode.DEVICE &&
+                        state.deviceNearestCityLabel == null &&
+                        readiness?.locationReady != true &&
+                        !state.locationPermissionPermanentlyDenied,
                 deviceLocationLookupFailed = state.deviceLocationLookupFailed,
+                isResolvingDeviceLocation = state.isResolvingDeviceLocation,
                 deviceNearestCityLabel = state.deviceNearestCityLabel,
                 fixedLatitude = state.fixedLatitude,
                 fixedLongitude = state.fixedLongitude,
                 cityQuery = state.cityQuery,
                 cityResults = state.cityResults,
-                selectedCity = state.selectedCity
+                selectedCity = state.selectedCity,
+                isCityDataLoading = state.isCityDataLoading,
+                isCityDataReady = state.isCityDataReady,
+                cityDataLoadProgress = state.cityDataLoadProgress,
+                cityDataLoadCurrent = state.cityDataLoadCurrent,
+                cityDataLoadTotal = state.cityDataLoadTotal
             ),
             onLocationModeChanged = onLocationModeChanged,
+            onRequestLocationPermission = onRequestLocationPermission,
             onOpenPermissionSettings = onOpenPermissionSettings,
             onCityQueryChanged = onCityQueryChanged,
             onCitySelected = onCitySelected
@@ -274,7 +288,7 @@ private fun ExactAlarmsStep(
 private fun SummaryStep(state: OnboardingState) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val locationSummary = if (state.locationMode == LocationMode.DEVICE) {
-            state.deviceNearestCityLabel?.let { "Device (near $it)" } ?: "Device"
+            state.deviceNearestCityLabel?.let { "Device ($it)" } ?: "Device"
         } else {
             when {
                 state.selectedCity != null -> "${state.selectedCity.name}, ${state.selectedCity.admin1Code}, ${state.selectedCity.countryCode}"

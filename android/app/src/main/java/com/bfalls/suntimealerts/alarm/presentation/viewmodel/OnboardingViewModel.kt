@@ -10,6 +10,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
 import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.cities.data.City
+import com.bfalls.suntimealerts.cities.data.CityImportProgress
 import com.bfalls.suntimealerts.cities.data.CityLookup
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,11 +26,17 @@ data class OnboardingState(
     val locationPermissionDeniedAttempts: Int = 0,
     val deviceNearestCityLabel: String? = null,
     val deviceLocationLookupFailed: Boolean = false,
+    val isResolvingDeviceLocation: Boolean = false,
     val fixedLatitude: String = "",
     val fixedLongitude: String = "",
     val cityQuery: String = "",
     val cityResults: List<City> = emptyList(),
     val selectedCity: City? = null,
+    val isCityDataLoading: Boolean = false,
+    val isCityDataReady: Boolean = false,
+    val cityDataLoadProgress: Float = 0f,
+    val cityDataLoadCurrent: Int = 0,
+    val cityDataLoadTotal: Int = 0,
     val sunriseEnabled: Boolean = false,
     val sunriseOffsetMinutes: Int = 0,
     val sunsetEnabled: Boolean = false,
@@ -52,6 +59,7 @@ class OnboardingViewModel(
 
     private var searchJob: Job? = null
     private var nearestCityJob: Job? = null
+    private var cityDataJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -69,8 +77,7 @@ class OnboardingViewModel(
             onboardingComplete = settings.onboardingComplete,
             locationMode = settings.locationMode,
             deviceNearestCityLabel = settings.lastResolvedDeviceLocation?.let { coordinate ->
-                cityRepository.findNearestCity(coordinate.latitude, coordinate.longitude)
-                    ?.let(::formatNearestCityLabel)
+                formatCoordinateLabel(coordinate.latitude, coordinate.longitude)
             },
             fixedLatitude = settings.fixedLocation?.latitude?.toString() ?: "",
             fixedLongitude = settings.fixedLocation?.longitude?.toString() ?: "",
@@ -136,15 +143,13 @@ class OnboardingViewModel(
 
         _state.value = _state.value.copy(
             locationMode = mode,
-            deviceNearestCityLabel = if (mode == LocationMode.DEVICE) {
-                _state.value.deviceNearestCityLabel
-            } else {
-                _state.value.deviceNearestCityLabel
-            },
-            deviceLocationLookupFailed = false
+            deviceLocationLookupFailed = false,
+            isResolvingDeviceLocation = false
         )
         if (mode == LocationMode.DEVICE) {
             refreshDeviceNearestCity()
+        } else {
+            ensureCityDataLoaded()
         }
     }
 
@@ -159,7 +164,8 @@ class OnboardingViewModel(
             _state.value = current.copy(
                 locationPermissionPermanentlyDenied = false,
                 locationPermissionDeniedAttempts = 0,
-                deviceLocationLookupFailed = false
+                deviceLocationLookupFailed = false,
+                isResolvingDeviceLocation = false
             )
             refreshReadiness()
             updateLocationMode(LocationMode.DEVICE)
@@ -172,7 +178,8 @@ class OnboardingViewModel(
         val updated = current.copy(
             locationPermissionPermanentlyDenied = forcedManual,
             locationPermissionDeniedAttempts = updatedAttempts,
-            deviceLocationLookupFailed = false
+            deviceLocationLookupFailed = false,
+            isResolvingDeviceLocation = false
         )
         _state.value = updated
 
@@ -211,6 +218,7 @@ class OnboardingViewModel(
 
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
+            ensureCityDataLoaded()
             val results = if (query.trim().length >= 2) {
                 cityRepository.searchCities(query)
             } else {
@@ -309,45 +317,86 @@ class OnboardingViewModel(
         nearestCityJob = viewModelScope.launch {
             _state.value = _state.value.copy(
                 deviceNearestCityLabel = null,
-                deviceLocationLookupFailed = false
+                deviceLocationLookupFailed = false,
+                isResolvingDeviceLocation = true
             )
             debugLog("Requesting device location for nearest city")
 
-            val coordinate = locationService.currentCoordinate() ?: run {
-                warnLog("Device coordinate unavailable; cannot compute nearest city")
-                _state.value = _state.value.copy(deviceLocationLookupFailed = true)
-                return@launch
+            try {
+                val coordinate = locationService.currentCoordinate() ?: run {
+                    warnLog("Device coordinate unavailable; cannot compute nearest city")
+                    _state.value = _state.value.copy(deviceLocationLookupFailed = true)
+                    return@launch
+                }
+
+                debugLog("Got coordinate from device: $coordinate")
+
+                val label = formatCoordinateLabel(
+                    coordinate.latitude,
+                    coordinate.longitude
+                )
+                val settings = settingsStore.load().copy(
+                    locationMode = LocationMode.DEVICE,
+                    lastResolvedDeviceLocation = coordinate
+                )
+                settingsStore.save(settings)
+                _state.value = _state.value.copy(
+                    deviceNearestCityLabel = label,
+                    deviceLocationLookupFailed = false
+                )
+                refreshReadinessInternal()
+            } finally {
+                _state.value = _state.value.copy(isResolvingDeviceLocation = false)
             }
+        }
+    }
 
-            debugLog("Got coordinate from device: $coordinate")
+    private fun ensureCityDataLoaded() {
+        if (_state.value.isCityDataReady) {
+            return
+        }
+        if (cityDataJob?.isActive == true) {
+            return
+        }
 
-            val nearest = cityRepository.findNearestCity(
-                coordinate.latitude,
-                coordinate.longitude
-            )
-            debugLog("Nearest city for $coordinate is $nearest")
-            val label = nearest?.let { formatNearestCityLabel(it) }
-            val settings = settingsStore.load().copy(
-                locationMode = LocationMode.DEVICE,
-                lastResolvedDeviceLocation = coordinate
-            )
-            settingsStore.save(settings)
+        cityDataJob = viewModelScope.launch {
             _state.value = _state.value.copy(
-                deviceNearestCityLabel = label,
-                deviceLocationLookupFailed = label == null
+                isCityDataLoading = true,
+                cityDataLoadProgress = 0f,
+                cityDataLoadCurrent = 0,
+                cityDataLoadTotal = 0
             )
-            refreshReadinessInternal()
+            try {
+                cityRepository.ensureCitiesLoaded(::updateCityDataProgress)
+            } finally {
+                _state.value = _state.value.copy(
+                    isCityDataLoading = false,
+                    isCityDataReady = true,
+                    cityDataLoadProgress = 1f,
+                    cityDataLoadCurrent = _state.value.cityDataLoadCurrent,
+                    cityDataLoadTotal = _state.value.cityDataLoadTotal
+                )
+            }
         }
     }
 
-    private fun formatNearestCityLabel(city: City): String {
-        val region = city.admin1Code.takeIf { it.isNotBlank() }
-        return if (region != null) {
-            "${city.name}, $region, ${city.countryCode}"
+    private fun updateCityDataProgress(progress: CityImportProgress) {
+        val fraction = if (progress.total > 0) {
+            progress.current.toFloat() / progress.total.toFloat()
         } else {
-            "${city.name}, ${city.countryCode}"
+            0f
         }
+        _state.value = _state.value.copy(
+            isCityDataLoading = true,
+            cityDataLoadProgress = fraction.coerceIn(0f, 1f),
+            cityDataLoadCurrent = progress.current,
+            cityDataLoadTotal = progress.total,
+            isCityDataReady = false
+        )
     }
+
+    private fun formatCoordinateLabel(latitude: Double, longitude: Double): String =
+        String.format("%.4f, %.4f", latitude, longitude)
 
     private fun debugLog(message: String) {
         runCatching {

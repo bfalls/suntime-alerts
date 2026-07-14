@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,8 +30,13 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,23 +48,44 @@ data class LocationPickerUiState(
     val locationPermissionPermanentlyDenied: Boolean = false,
     val locationPermissionMissing: Boolean = false,
     val deviceLocationLookupFailed: Boolean = false,
+    val isResolvingDeviceLocation: Boolean = false,
     val deviceNearestCityLabel: String? = null,
     val fixedLatitude: String = "",
     val fixedLongitude: String = "",
     val cityQuery: String = "",
     val cityResults: List<City> = emptyList(),
-    val selectedCity: City? = null
+    val selectedCity: City? = null,
+    val isCityDataLoading: Boolean = false,
+    val isCityDataReady: Boolean = false,
+    val cityDataLoadProgress: Float = 0f,
+    val cityDataLoadCurrent: Int = 0,
+    val cityDataLoadTotal: Int = 0
 )
 
 @Composable
 fun LocationPickerPane(
     state: LocationPickerUiState,
     onLocationModeChanged: (LocationMode) -> Unit,
+    onRequestLocationPermission: () -> Unit,
     onOpenPermissionSettings: () -> Unit,
     onCityQueryChanged: (String) -> Unit,
     onCitySelected: (City) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val cityFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(state.locationMode, state.isCityDataLoading, state.isCityDataReady) {
+        if (
+            state.locationMode == LocationMode.FIXED &&
+            state.isCityDataReady &&
+            !state.isCityDataLoading
+        ) {
+            cityFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -101,70 +128,88 @@ fun LocationPickerPane(
                     if (state.locationPermissionPermanentlyDenied) {
                         "Location permission is disabled. Open Settings to enable device location."
                     } else {
-                        "Location permission is not granted. Open Settings to enable device location."
+                        "Location permission is not granted yet. Allow it to use device location, or switch to Manual."
                     }
                 )
-                OutlinedButton(onClick = onOpenPermissionSettings) {
-                    Text("Open Settings")
+                if (state.locationPermissionPermanentlyDenied) {
+                    OutlinedButton(onClick = onOpenPermissionSettings) {
+                        Text("Open Settings")
+                    }
+                } else {
+                    OutlinedButton(onClick = onRequestLocationPermission) {
+                        Text("Allow location")
+                    }
                 }
             }
         }
         if (state.locationMode == LocationMode.FIXED) {
-            OutlinedTextField(
-                value = state.cityQuery,
-                onValueChange = onCityQueryChanged,
-                label = { Text("City") },
-                placeholder = { Text("Start typing a city name") },
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                    focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+            if (state.isCityDataLoading || !state.isCityDataReady) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Loading offline city database for Manual location...")
+                    CircularProgressIndicator(progress = { state.cityDataLoadProgress })
+                    if (state.cityDataLoadTotal > 0) {
+                        Text("${state.cityDataLoadCurrent} / ${state.cityDataLoadTotal}")
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = state.cityQuery,
+                    onValueChange = onCityQueryChanged,
+                    label = { Text("City") },
+                    placeholder = { Text("Start typing a city name") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(cityFocusRequester),
+                    leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    )
                 )
-            )
-            if (state.cityQuery.trim().length >= 2) {
-                if (state.cityResults.isEmpty()) {
-                    Text("No matching cities yet")
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 300.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(vertical = 4.dp)
-                    ) {
-                        items(state.cityResults) { city ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable(
-                                        role = Role.Button,
-                                        onClick = { onCitySelected(city) }
+                if (state.cityQuery.trim().length >= 2) {
+                    if (state.cityResults.isEmpty()) {
+                        Text("No matching cities yet")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 300.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(vertical = 4.dp)
+                        ) {
+                            items(state.cityResults) { city ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(
+                                            role = Role.Button,
+                                            onClick = { onCitySelected(city) }
+                                        ),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.elevatedCardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
                                     ),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.elevatedCardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
-                                ),
-                                border = BorderStroke(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                                ),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("${city.name}, ${city.countryCode}", fontWeight = FontWeight.SemiBold)
-                                    Text(
-                                        "${city.admin1Code} - ${city.lat}, ${city.lon}",
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                                    )
+                                    border = BorderStroke(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                                    ),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text("${city.name}, ${city.countryCode}", fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            "${city.admin1Code} - ${city.lat}, ${city.lon}",
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -189,15 +234,27 @@ fun LocationPickerPane(
         }
         if (state.locationMode == LocationMode.DEVICE) {
             when (val label = state.deviceNearestCityLabel) {
-                null -> if (state.deviceLocationLookupFailed) {
+                null -> if (state.isResolvingDeviceLocation) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("We could not get a device location yet.")
-                        Text("Switch to Manual to choose a city, or try Device again once location is available.")
+                        Text("Finding device location...")
+                        CircularProgressIndicator()
                     }
                 } else {
-                    Text("Finding nearest city...")
+                    if (
+                        state.deviceLocationLookupFailed &&
+                        !state.locationPermissionMissing &&
+                        !state.locationPermissionPermanentlyDenied
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("We could not get a device location yet.")
+                        }
+                    } else {
+                        if (!state.locationPermissionMissing && !state.locationPermissionPermanentlyDenied) {
+                            Text("Finding device location...")
+                        }
+                    }
                 }
-                else -> Text("Nearest city: $label")
+                else -> Text("Device location: $label")
             }
         }
     }

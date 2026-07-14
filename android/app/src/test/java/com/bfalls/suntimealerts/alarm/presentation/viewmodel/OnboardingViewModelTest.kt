@@ -120,7 +120,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         assertEquals(LocationMode.DEVICE, viewModel.state.value.locationMode)
-        assertEquals("Denver, CO, US", viewModel.state.value.deviceNearestCityLabel)
+        assertEquals("39.7392, -104.9903", viewModel.state.value.deviceNearestCityLabel)
         assertFalse(viewModel.state.value.deviceLocationLookupFailed)
     }
 
@@ -146,7 +146,7 @@ class OnboardingViewModelTest {
         advanceUntilIdle()
 
         assertEquals(LocationMode.DEVICE, viewModel.state.value.locationMode)
-        assertEquals("Denver, CO, US", viewModel.state.value.deviceNearestCityLabel)
+        assertEquals("39.7392, -104.9903", viewModel.state.value.deviceNearestCityLabel)
         assertFalse(viewModel.state.value.deviceLocationLookupFailed)
     }
 
@@ -325,6 +325,9 @@ class OnboardingViewModelTest {
     private class FakeCityLookup(
         private val nearestCity: City? = null
     ) : CityLookup {
+        override suspend fun ensureCitiesLoaded(
+            onProgress: ((com.bfalls.suntimealerts.cities.data.CityImportProgress) -> Unit)?
+        ) = Unit
         override suspend fun searchCities(query: String, limit: Int): List<City> = emptyList()
         override suspend fun findNearestCity(lat: Double, lon: Double): City? = nearestCity
     }

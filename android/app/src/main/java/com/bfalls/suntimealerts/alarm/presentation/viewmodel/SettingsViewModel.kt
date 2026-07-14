@@ -15,6 +15,7 @@ import com.bfalls.suntimealerts.alarm.presentation.ui.LocationPickerUiState
 import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
 import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.cities.data.City
+import com.bfalls.suntimealerts.cities.data.CityImportProgress
 import com.bfalls.suntimealerts.cities.data.CityRepository
 import com.bfalls.suntimealerts.utils.hasLocationPermission
 import kotlinx.coroutines.Job
@@ -46,6 +47,7 @@ class SettingsViewModel(
 
     private var searchJob: Job? = null
     private var nearestCityJob: Job? = null
+    private var cityDataJob: Job? = null
 
     init {
         viewModelScope.launch { load() }
@@ -60,11 +62,16 @@ class SettingsViewModel(
                 locationMode = settings.locationMode,
                 locationPermissionPermanentlyDenied = false,
                 locationPermissionMissing = locationPermissionMissing,
-                deviceNearestCityLabel = null,
+                deviceNearestCityLabel = settings.lastResolvedDeviceLocation?.let { coordinate ->
+                    formatCoordinateLabel(coordinate.latitude, coordinate.longitude)
+                },
+                isResolvingDeviceLocation = false,
                 fixedLatitude = settings.fixedLocation?.latitude?.toString() ?: "",
                 fixedLongitude = settings.fixedLocation?.longitude?.toString() ?: "",
                 cityQuery = settings.fixedLocation?.let { "" } ?: "",
-                selectedCity = null
+                selectedCity = null,
+                isCityDataLoading = false,
+                isCityDataReady = false
             ),
             skyBodySize = settings.skyBodySize,
             appThemeMode = settings.appThemeMode,
@@ -80,12 +87,15 @@ class SettingsViewModel(
             current.copy(
                 locationState = current.locationState.copy(
                     locationMode = mode,
-                    deviceNearestCityLabel = if (mode == LocationMode.DEVICE) null else current.locationState.deviceNearestCityLabel
+                    deviceNearestCityLabel = if (mode == LocationMode.DEVICE) null else current.locationState.deviceNearestCityLabel,
+                    isResolvingDeviceLocation = false
                 )
             )
         }
         if (mode == LocationMode.DEVICE) {
             refreshDeviceNearestCity()
+        } else {
+            ensureCityDataLoaded()
         }
     }
 
@@ -94,7 +104,8 @@ class SettingsViewModel(
             current.copy(
                 locationState = current.locationState.copy(
                     locationPermissionMissing = !granted,
-                    locationPermissionPermanentlyDenied = current.locationState.locationPermissionPermanentlyDenied && !granted
+                    locationPermissionPermanentlyDenied = current.locationState.locationPermissionPermanentlyDenied && !granted,
+                    isResolvingDeviceLocation = false
                 )
             )
         }
@@ -110,6 +121,7 @@ class SettingsViewModel(
         }
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
+            ensureCityDataLoaded()
             val results = if (query.trim().length >= 2) {
                 cityRepository.searchCities(query)
             } else {
@@ -139,21 +151,87 @@ class SettingsViewModel(
         nearestCityJob?.cancel()
         nearestCityJob = viewModelScope.launch {
             _state.update { current ->
-                current.copy(locationState = current.locationState.copy(deviceNearestCityLabel = null))
+                current.copy(
+                    locationState = current.locationState.copy(
+                        deviceNearestCityLabel = null,
+                        isResolvingDeviceLocation = true
+                    )
+                )
             }
-            val coordinate = locationService.currentCoordinate() ?: return@launch
-            val nearest = cityRepository.findNearestCity(coordinate.latitude, coordinate.longitude)
-            val label = nearest?.let { city ->
-                val region = city.admin1Code.takeIf { it.isNotBlank() }
-                if (region != null) {
-                    "${city.name}, $region, ${city.countryCode}"
-                } else {
-                    "${city.name}, ${city.countryCode}"
+            try {
+                val coordinate = locationService.currentCoordinate() ?: return@launch
+                val label = formatCoordinateLabel(coordinate.latitude, coordinate.longitude)
+                val settings = settingsStore.load().copy(
+                    locationMode = LocationMode.DEVICE,
+                    lastResolvedDeviceLocation = coordinate
+                )
+                settingsStore.save(settings)
+                _state.update { current ->
+                    current.copy(locationState = current.locationState.copy(deviceNearestCityLabel = label))
+                }
+            } finally {
+                _state.update { current ->
+                    current.copy(
+                        locationState = current.locationState.copy(
+                            isResolvingDeviceLocation = false
+                        )
+                    )
                 }
             }
+        }
+    }
+
+    private fun ensureCityDataLoaded() {
+        if (_state.value.locationState.isCityDataReady) {
+            return
+        }
+        if (cityDataJob?.isActive == true) {
+            return
+        }
+
+        cityDataJob = viewModelScope.launch {
             _state.update { current ->
-                current.copy(locationState = current.locationState.copy(deviceNearestCityLabel = label))
+                current.copy(
+                    locationState = current.locationState.copy(
+                        isCityDataLoading = true,
+                        cityDataLoadProgress = 0f,
+                        cityDataLoadCurrent = 0,
+                        cityDataLoadTotal = 0
+                    )
+                )
             }
+            try {
+                cityRepository.ensureCitiesLoaded(::updateCityDataProgress)
+            } finally {
+                _state.update { current ->
+                    current.copy(
+                        locationState = current.locationState.copy(
+                            isCityDataLoading = false,
+                            isCityDataReady = true,
+                            cityDataLoadProgress = 1f
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun updateCityDataProgress(progress: CityImportProgress) {
+        val fraction = if (progress.total > 0) {
+            progress.current.toFloat() / progress.total.toFloat()
+        } else {
+            0f
+        }
+        _state.update { current ->
+            current.copy(
+                locationState = current.locationState.copy(
+                    isCityDataLoading = true,
+                    cityDataLoadProgress = fraction.coerceIn(0f, 1f),
+                    cityDataLoadCurrent = progress.current,
+                    cityDataLoadTotal = progress.total,
+                    isCityDataReady = false
+                )
+            )
         }
     }
 
@@ -237,6 +315,9 @@ class SettingsViewModel(
             }
         }
     }
+
+    private fun formatCoordinateLabel(latitude: Double, longitude: Double): String =
+        String.format("%.4f, %.4f", latitude, longitude)
 }
 
 class SettingsViewModelFactory(
