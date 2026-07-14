@@ -1,15 +1,19 @@
 package com.bfalls.suntimealerts.alarm.presentation.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -21,6 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
@@ -110,16 +117,28 @@ fun OnboardingScreen(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                Text(
-                    text = when (state.step) {
-                        OnboardingStep.WELCOME -> "Welcome"
-                        OnboardingStep.LOCATION -> "Choose location"
-                        OnboardingStep.NOTIFICATIONS -> "Notifications"
-                        OnboardingStep.EXACT_ALARMS -> "Alarms & reminders"
-                        OnboardingStep.SUMMARY -> "Summary"
-                    },
-                    fontWeight = FontWeight.SemiBold
-                )
+                when (state.step) {
+                    OnboardingStep.WELCOME -> OnboardingBanner(
+                        title = "Welcome",
+                        subtitle = "Setup"
+                    )
+                    OnboardingStep.LOCATION -> OnboardingBanner(
+                        title = "Choose location",
+                        subtitle = "Setup"
+                    )
+                    OnboardingStep.NOTIFICATIONS -> OnboardingBanner(
+                        title = "Notifications",
+                        subtitle = "Setup"
+                    )
+                    OnboardingStep.EXACT_ALARMS -> OnboardingBanner(
+                        title = "Alarms & reminders",
+                        subtitle = "Setup"
+                    )
+                    OnboardingStep.SUMMARY -> OnboardingBanner(
+                        title = "Summary",
+                        subtitle = "Setup"
+                    )
+                }
 
                 when (state.step) {
                     OnboardingStep.WELCOME -> WelcomeStep()
@@ -152,7 +171,56 @@ fun OnboardingScreen(
 private fun WelcomeStep() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Suntime Alerts keeps you aligned with sunrise and sunset.")
-        Text("Setup checks location, notifications, and exact alarms before alerts start.")
+        Text("Let's setup the app with location, notifications, and exact alarms permissions to get you started.")
+    }
+}
+
+@Composable
+private fun OnboardingBanner(
+    title: String,
+    subtitle: String
+) {
+    val shape = RoundedCornerShape(24.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(132.dp)
+            .clip(shape)
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF0F2740),
+                        Color(0xFF2D5B88),
+                        Color(0xFF89BDEA)
+                    )
+                )
+            )
+            .padding(horizontal = 20.dp, vertical = 18.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Text(
+                text = subtitle,
+                color = Color.White.copy(alpha = 0.82f),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Suntime Alerts",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = title,
+                    color = Color.White.copy(alpha = 0.94f),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
     }
 }
 
@@ -227,7 +295,7 @@ private fun NotificationsStep(
             "Tap Continue to open app notification settings."
         readiness?.repairActions?.contains(AlarmRepairAction.OPEN_NOTIFICATION_CHANNEL_SETTINGS) == true ->
             "Re-enable the Suntime Alerts notification channel in system settings."
-        else -> "No action needed."
+        else -> null
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         CapabilityCard(
@@ -271,7 +339,7 @@ private fun ExactAlarmsStep(
             action = if (permissionRequired) {
                 "Tap Continue to open Alarms & reminders settings."
             } else {
-                "No action needed."
+                null
             },
             fallback = "You can skip, but alerts will not be scheduled reliably until exact alarms are allowed."
         )
@@ -313,7 +381,7 @@ private fun ReadinessSummary(state: OnboardingState) {
         title = "Setup complete",
         ready = true,
         reason = "Finishing onboarding saves your first-run choices. Alert readiness can change later and is repaired from Home or Settings.",
-        action = "Save & Start is enabled.",
+        action = null,
         fallback = null
     )
     CapabilityCard(
@@ -321,7 +389,7 @@ private fun ReadinessSummary(state: OnboardingState) {
         ready = readiness.canDeliverReliableAlerts,
         reason = "This reflects whether sunrise and sunset alerts can fire reliably right now.",
         action = if (readiness.canDeliverReliableAlerts) {
-            "Alerts are ready."
+            "Sunrise and sunset alerts can fire reliably now."
         } else {
             "You can finish setup now and repair later: ${readiness.missingCapabilities.joinToString { it.label() }}"
         },
@@ -334,7 +402,7 @@ private fun CapabilityCard(
     title: String,
     ready: Boolean,
     reason: String,
-    action: String,
+    action: String?,
     fallback: String?
 ) {
     Card(
@@ -368,7 +436,9 @@ private fun CapabilityCard(
                 )
             }
             Text(reason)
-            Text("Action: $action")
+            if (action != null) {
+                Text("Action: $action")
+            }
             if (fallback != null) {
                 Text("Fallback: $fallback")
             }
