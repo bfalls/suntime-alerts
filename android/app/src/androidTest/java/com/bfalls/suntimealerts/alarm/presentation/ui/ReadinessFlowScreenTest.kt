@@ -71,7 +71,6 @@ class ReadinessFlowScreenTest {
 
         composeTestRule.onNodeWithText("Setup complete").assertExistsCompat()
         composeTestRule.onNodeWithText("Alerts ready now").assertExistsCompat()
-        composeTestRule.onNodeWithText("Save & Start is enabled.").assertExistsCompat()
         composeTestRule.onNodeWithText("You can finish setup now and repair later: exact alarms, notifications").assertExistsCompat()
     }
 
@@ -117,7 +116,46 @@ class ReadinessFlowScreenTest {
         }
 
         composeTestRule.onNodeWithText("Allow location or choose Manual.").assertExistsCompat()
-        composeTestRule.onNodeWithText("Manual city selection is supported if device location is unavailable.").assertExistsCompat()
+        composeTestRule.onNodeWithText("If device location is unavailable, you can choose a city manually instead.").assertExistsCompat()
+    }
+
+    @Test
+    fun onboardingCardsDoNotRenderActionOrFallbackLabels() {
+        composeTestRule.setContent {
+            SuntimeAlertsTheme {
+                OnboardingScreen(
+                    state = OnboardingState(
+                        isLoaded = true,
+                        step = OnboardingStep.NOTIFICATIONS,
+                        alarmReadiness = degradedReadiness(
+                            notificationsReady = false,
+                            missingCapabilities = listOf(AlarmReadinessIssue.NOTIFICATIONS),
+                            repairActions = listOf(AlarmRepairAction.REQUEST_NOTIFICATION_PERMISSION)
+                        )
+                    ),
+                    onLocationModeChanged = {},
+                    onRequestLocationPermission = {},
+                    onOpenPermissionSettings = {},
+                    onOpenNotificationSettings = {},
+                    onOpenNotificationChannelSettings = {},
+                    onCityQueryChanged = {},
+                    onCitySelected = {},
+                    notificationsPermissionRequired = true,
+                    exactAlarmPermissionRequired = false,
+                    onNotificationsContinue = {},
+                    onNotificationsSkip = {},
+                    onExactAlarmsContinue = {},
+                    onExactAlarmsSkip = {},
+                    onNext = {},
+                    onBack = {},
+                    onComplete = {},
+                    canAdvance = true
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Action:", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Fallback:", substring = true).assertDoesNotExist()
     }
 
     @Test

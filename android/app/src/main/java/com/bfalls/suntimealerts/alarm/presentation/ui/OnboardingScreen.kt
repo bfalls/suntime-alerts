@@ -246,7 +246,7 @@ private fun LocationStep(
                 state.locationMode == LocationMode.FIXED -> "Search for and select a city."
                 else -> "Confirm the device location."
             },
-            fallback = "Manual city selection is supported if device location is unavailable."
+            fallback = "If device location is unavailable, you can choose a city manually instead."
         )
         LocationPickerPane(
             state = LocationPickerUiState(
@@ -304,7 +304,7 @@ private fun NotificationsStep(
                 readiness.notificationChannelReady,
             reason = "Alerts can only ring if Android allows this app and its alarm channels to notify you.",
             action = action,
-            fallback = "You can skip, but alerts will not be reliable until notifications are enabled."
+            fallback = "You can skip this for now, but alerts will not be reliable until notifications are enabled."
         )
         Text(
             "Suntime Alerts can send sunrise and sunset alerts. Android requires permission to post notifications. You can enable this now or skip and enable later in Settings."
@@ -341,7 +341,7 @@ private fun ExactAlarmsStep(
             } else {
                 null
             },
-            fallback = "You can skip, but alerts will not be scheduled reliably until exact alarms are allowed."
+            fallback = "You can skip this for now, but alerts will not be scheduled reliably until exact alarms are allowed."
         )
         Text(
             "To trigger alerts at the right time, Suntime Alerts needs exact alarm access. We'll open the Alarms & reminders settings so you can allow it. If exact alarms stay off, the app will not treat alerts as reliably scheduled."
@@ -436,11 +436,9 @@ private fun CapabilityCard(
                 )
             }
             Text(reason)
-            if (action != null) {
-                Text("Action: $action")
-            }
-            if (fallback != null) {
-                Text("Fallback: $fallback")
+            val guidance = listOfNotNull(action, fallback).joinToString(" ")
+            if (guidance.isNotBlank()) {
+                Text(guidance)
             }
         }
     }
