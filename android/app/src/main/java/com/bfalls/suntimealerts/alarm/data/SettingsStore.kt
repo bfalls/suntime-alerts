@@ -8,11 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
-import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNRISE_ALARM_ID
-import com.bfalls.suntimealerts.alarm.domain.model.DEFAULT_SUNSET_ALARM_ID
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarmConfig
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
@@ -163,40 +160,6 @@ class SettingsStore(private val context: Context) : SettingsRepository {
     }
 
     private fun migrateAlarms(prefs: Preferences): List<SunAlarm> {
-        val hasLegacyOffsets = prefs.contains(sunriseOffset) || prefs.contains(sunsetOffset)
-        if (!hasLegacyOffsets) return emptyList()
-
-        return migrateLegacyAlarms(
-            sunriseOffset = prefs[sunriseOffset] ?: 0,
-            sunsetOffset = prefs[sunsetOffset] ?: 0,
-            sunriseEnabled = false,
-            sunsetEnabled = false
-        )
+        return emptyList()
     }
 }
-
-internal fun migrateLegacyAlarms(
-    sunriseOffset: Int,
-    sunsetOffset: Int,
-    sunriseEnabled: Boolean,
-    sunsetEnabled: Boolean
-): List<SunAlarm> = listOf(
-    SunAlarm(
-        id = DEFAULT_SUNRISE_ALARM_ID,
-        type = SunEventType.SUNRISE,
-        offsetMinutes = sunriseOffset,
-        label = "Sunrise",
-        enabled = sunriseEnabled,
-        recurrenceDays = ALL_DAYS_MASK,
-        vibrate = true
-    ),
-    SunAlarm(
-        id = DEFAULT_SUNSET_ALARM_ID,
-        type = SunEventType.SUNSET,
-        offsetMinutes = sunsetOffset,
-        label = "Sunset",
-        enabled = sunsetEnabled,
-        recurrenceDays = ALL_DAYS_MASK,
-        vibrate = true
-    )
-)
