@@ -119,7 +119,6 @@ import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
-import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.domain.model.includesDay
 import com.bfalls.suntimealerts.alarm.domain.model.toBitMask
 import com.bfalls.suntimealerts.alarm.services.AlarmRepairAction
@@ -498,13 +497,10 @@ private fun AlarmRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = formatOffset(alarm.offsetMinutes),
+                text = alarmPrimaryText(alarm),
                 fontWeight = FontWeight.Bold
             )
-            val description = appendRecurrenceLabel(
-                label = alarm.label,
-                recurrenceSummary = recurrenceSummary(alarm.recurrenceDays)
-            )
+            val description = alarmSecondaryText(alarm)
             if (description.isNotBlank()) {
                 Text(text = description)
             }
