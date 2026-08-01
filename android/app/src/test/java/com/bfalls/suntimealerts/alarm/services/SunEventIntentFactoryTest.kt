@@ -33,7 +33,6 @@ class SunEventIntentFactoryTest {
     @Test
     fun `action and receiver metadata are stable`() {
         assertEquals(SunEventIntentFactory.ACTION_SUN_EVENT_ALARM, "com.bfalls.suntimealerts.SUN_EVENT_ALARM")
-        assertEquals(SunEventIntentFactory.ACTION_DEBUG_RECONCILE_ALARMS, "com.bfalls.suntimealerts.DEBUG_RECONCILE_ALARMS")
         assertEquals("com.bfalls.suntimealerts.alarm.services.SunEventReceiver", SunEventReceiver::class.java.name)
     }
 }

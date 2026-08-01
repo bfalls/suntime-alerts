@@ -10,7 +10,6 @@ import kotlin.math.abs
 
 object SunEventIntentFactory {
     const val ACTION_SUN_EVENT_ALARM = "com.bfalls.suntimealerts.SUN_EVENT_ALARM"
-    const val ACTION_DEBUG_RECONCILE_ALARMS = "com.bfalls.suntimealerts.DEBUG_RECONCILE_ALARMS"
     private const val RECEIVER_PACKAGE = "com.bfalls.suntimealerts"
 
     data class Identity(
