@@ -57,3 +57,7 @@ fastlane/test_output
 
 # Logs
 *.log
+
+# Local Android release review artifacts
+android/*-android-review.zip
+android/app/release/
