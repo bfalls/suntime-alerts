@@ -342,8 +342,31 @@ fun HomeScreenContent(
                         }
                     }
                 }
+
+                ExtendedFloatingActionButton(
+                    onClick = { showFeedbackDialog = true },
+                    icon = {
+                        Icon(
+                            Icons.Default.Feedback,
+                            contentDescription = "Send feedback"
+                        )
+                    },
+                    text = { Text("Feedback") },
+                    modifier = Modifier.align(Alignment.BottomStart)
+                )
             }
         }
+    }
+
+    if (showFeedbackDialog) {
+        FeedbackDialog(
+            onDismiss = { showFeedbackDialog = false },
+            onEmailUnavailable = {
+                scope.launch {
+                    snackbarHostState.showSnackbar("No email app is available on this device.")
+                }
+            }
+        )
     }
 
     if (showSheet) {
