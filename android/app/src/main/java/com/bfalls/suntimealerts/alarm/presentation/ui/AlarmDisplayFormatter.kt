@@ -2,6 +2,8 @@ package com.bfalls.suntimealerts.alarm.presentation.ui
 
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
+import java.time.Duration
+import java.time.ZonedDateTime
 import kotlin.math.abs
 
 internal fun alarmPrimaryText(alarm: SunAlarm): String =
@@ -29,6 +31,34 @@ internal fun alarmTimingText(type: SunEventType, offsetMinutes: Int): String {
 
     return "$duration $direction ${eventLabel(type).lowercase()}"
 }
+
+internal fun oneShotTimingMessage(
+    type: SunEventType,
+    offsetMinutes: Int,
+    sunrise: ZonedDateTime?,
+    sunset: ZonedDateTime?,
+    now: ZonedDateTime
+): String? {
+    val eventTime = when (type) {
+        SunEventType.SUNRISE -> sunrise
+        SunEventType.SUNSET -> sunset
+    } ?: return null
+    val triggerTime = eventTime.plusMinutes(offsetMinutes.toLong())
+    if (!triggerTime.isAfter(now)) return "Fires tomorrow."
+
+    val minutesUntil = Duration.between(now, triggerTime).toMinutes().coerceAtLeast(0)
+    return when {
+        minutesUntil == 0L -> "Fires in under a minute."
+        minutesUntil < 60 -> "Fires in about $minutesUntil ${minuteLabel(minutesUntil)}."
+        minutesUntil < 90 -> "Fires in about an hour."
+        else -> {
+            val hoursUntil = ((minutesUntil + 30) / 60).coerceAtLeast(2)
+            "Fires in about $hoursUntil hours."
+        }
+    }
+}
+
+private fun minuteLabel(minutes: Long): String = if (minutes == 1L) "minute" else "minutes"
 
 private fun eventLabel(type: SunEventType): String = when (type) {
     SunEventType.SUNRISE -> "Sunrise"

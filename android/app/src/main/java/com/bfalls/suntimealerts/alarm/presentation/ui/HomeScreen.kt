@@ -376,6 +376,9 @@ fun HomeScreenContent(
         AlarmEditorSheet(
             initialAlarm = editingAlarm,
             defaultType = sheetType,
+            sunriseTime = state.sunriseTime,
+            sunsetTime = state.sunsetTime,
+            now = state.now,
             onDismiss = { showSheet = false },
             onSave = { alarm ->
                 if (editingAlarm == null) {
@@ -593,6 +596,9 @@ private fun initialAlarmValues(alarm: SunAlarm?, defaultType: SunEventType): Ala
 private fun AlarmEditorSheet(
     initialAlarm: SunAlarm?,
     defaultType: SunEventType,
+    sunriseTime: ZonedDateTime?,
+    sunsetTime: ZonedDateTime?,
+    now: ZonedDateTime,
     onDismiss: () -> Unit,
     onSave: (SunAlarm) -> Unit,
     onDelete: (SunAlarm) -> Unit,
@@ -613,6 +619,7 @@ private fun AlarmEditorSheet(
     var soundUriValue by rememberSaveable { mutableStateOf(initialValues.soundUriValue) }
     var vibrate by rememberSaveable { mutableStateOf(initialValues.vibrate) }
     val context = LocalContext.current
+    var liveNow by remember { mutableStateOf(now) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     val currentValues = AlarmEditorValues(
         type = type,
@@ -628,6 +635,20 @@ private fun AlarmEditorSheet(
     val hasEdits = currentValues != initialValues
     val isInputValid = true
     val canSave = (initialAlarm == null || hasEdits) && isInputValid
+    val offsetMinutes = (hours * 60 + minutes).let { totalMinutes ->
+        if (isAfter) totalMinutes else -totalMinutes
+    }
+    val timingMessage = if (enabled && recurrenceMask == 0) {
+        oneShotTimingMessage(
+            type = type,
+            offsetMinutes = offsetMinutes,
+            sunrise = sunriseTime,
+            sunset = sunsetTime,
+            now = liveNow
+        )
+    } else {
+        null
+    }
     val ringtoneLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -642,6 +663,17 @@ private fun AlarmEditorSheet(
             uri == null -> ""
             uri == Settings.System.DEFAULT_ALARM_ALERT_URI -> null
             else -> uri.toString()
+        }
+    }
+
+    LaunchedEffect(now) {
+        liveNow = now
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60 * 1000L)
+            liveNow = ZonedDateTime.now(now.zone)
         }
     }
 
@@ -813,6 +845,20 @@ private fun AlarmEditorSheet(
                                 )
                             }
                         }
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (timingMessage != null) {
+                        Text(
+                            text = timingMessage,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
                 Column(
