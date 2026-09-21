@@ -164,6 +164,45 @@ class SunScheduleServiceTest {
     }
 
     @Test
+    fun schedulesOneShotAlarmWithEmptyRecurrenceMask() = runTest {
+        val calculator = SunTimesCalculator()
+        val fixedInstant = Instant.parse("2024-01-01T12:00:00Z")
+        val zone = ZoneId.of("UTC")
+        val clock = Clock.fixed(fixedInstant, zone)
+        val notificationScheduler = RecordingNotificationScheduler()
+        val repo = object : SettingsRepository {
+            override suspend fun load(): UserSettings = TODO("Not used")
+            override suspend fun save(settings: UserSettings) = Unit
+            override suspend fun loadAlarms(): List<SunAlarm> = alarms
+            override suspend fun saveAlarms(alarms: List<SunAlarm>) = Unit
+
+            private val alarms = listOf(
+                SunAlarm(
+                    type = SunEventType.SUNRISE,
+                    offsetMinutes = 0,
+                    label = "One-shot",
+                    enabled = true,
+                    recurrenceDays = 0
+                )
+            )
+        }
+        val service = SunScheduleService(calculator, repo, notificationScheduler, clock)
+        val coordinate = Coordinate(0.0, 0.0)
+
+        service.schedule(coordinate, zone)
+
+        val today = LocalDate.now(clock)
+        assertTrue(
+            "One-shot alarms with no selected repeat days should schedule the next occurrence",
+            notificationScheduler.entries.size == 1
+        )
+        assertTrue(
+            "One-shot sunrise after today's sunrise should schedule tomorrow",
+            notificationScheduler.entries.single().date == today.plusDays(1)
+        )
+    }
+
+    @Test
     fun unschedulesWhenAlarmIsDisabled() = runTest {
         val calculator = SunTimesCalculator()
         val notificationScheduler = RecordingNotificationScheduler()

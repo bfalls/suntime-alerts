@@ -1,6 +1,5 @@
 package com.bfalls.suntimealerts.alarm.domain.service
 
-import com.bfalls.suntimealerts.alarm.domain.model.ALL_DAYS_MASK
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
@@ -38,12 +37,12 @@ class AlarmOccurrenceCalculator(
     ): List<Occurrence> {
         val zonedClock = clock.withZone(zoneId)
         val nowMillis = Instant.now(zonedClock).toEpochMilli()
-        val recurrenceMask = alarm.recurrenceDays ?: ALL_DAYS_MASK
+        val recurrenceMask = alarm.recurrenceDays?.takeIf { it != 0 }
 
         return buildList {
             for (daysFromNow in 0 until days) {
                 val date = startDate.plusDays(daysFromNow.toLong())
-                if (!recurrenceMask.includesDay(date.dayOfWeek)) continue
+                if (recurrenceMask != null && !recurrenceMask.includesDay(date.dayOfWeek)) continue
 
                 val sunTimes = calculator.calculateSunTimes(date, coordinate, zoneId)
                 val baseTime = when (alarm.type) {
