@@ -57,10 +57,13 @@ class ReadinessFlowScreenTest {
                     onCitySelected = {},
                     notificationsPermissionRequired = true,
                     exactAlarmPermissionRequired = true,
+                    fullScreenAlarmPermissionRequired = false,
                     onNotificationsContinue = {},
                     onNotificationsSkip = {},
                     onExactAlarmsContinue = {},
                     onExactAlarmsSkip = {},
+                    onFullScreenAlarmsContinue = {},
+                    onFullScreenAlarmsSkip = {},
                     onNext = {},
                     onBack = {},
                     onComplete = {},
@@ -103,10 +106,13 @@ class ReadinessFlowScreenTest {
                     onCitySelected = {},
                     notificationsPermissionRequired = false,
                     exactAlarmPermissionRequired = false,
+                    fullScreenAlarmPermissionRequired = false,
                     onNotificationsContinue = {},
                     onNotificationsSkip = {},
                     onExactAlarmsContinue = {},
                     onExactAlarmsSkip = {},
+                    onFullScreenAlarmsContinue = {},
+                    onFullScreenAlarmsSkip = {},
                     onNext = {},
                     onBack = {},
                     onComplete = {},
@@ -142,10 +148,13 @@ class ReadinessFlowScreenTest {
                     onCitySelected = {},
                     notificationsPermissionRequired = true,
                     exactAlarmPermissionRequired = false,
+                    fullScreenAlarmPermissionRequired = false,
                     onNotificationsContinue = {},
                     onNotificationsSkip = {},
                     onExactAlarmsContinue = {},
                     onExactAlarmsSkip = {},
+                    onFullScreenAlarmsContinue = {},
+                    onFullScreenAlarmsSkip = {},
                     onNext = {},
                     onBack = {},
                     onComplete = {},
@@ -156,6 +165,49 @@ class ReadinessFlowScreenTest {
 
         composeTestRule.onNodeWithText("Action:", substring = true).assertDoesNotExist()
         composeTestRule.onNodeWithText("Fallback:", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun onboardingFullScreenAlarmStepExplainsBannerFallback() {
+        composeTestRule.setContent {
+            SuntimeAlertsTheme {
+                OnboardingScreen(
+                    state = OnboardingState(
+                        isLoaded = true,
+                        step = OnboardingStep.FULL_SCREEN_ALARMS,
+                        alarmReadiness = degradedReadiness(
+                            fullScreenIntentReady = false,
+                            canDeliverReliableAlerts = true,
+                            missingCapabilities = emptyList(),
+                            repairActions = listOf(AlarmRepairAction.OPEN_FULL_SCREEN_INTENT_SETTINGS)
+                        )
+                    ),
+                    onLocationModeChanged = {},
+                    onRequestLocationPermission = {},
+                    onOpenPermissionSettings = {},
+                    onOpenNotificationSettings = {},
+                    onOpenNotificationChannelSettings = {},
+                    onCityQueryChanged = {},
+                    onCitySelected = {},
+                    notificationsPermissionRequired = false,
+                    exactAlarmPermissionRequired = false,
+                    fullScreenAlarmPermissionRequired = true,
+                    onNotificationsContinue = {},
+                    onNotificationsSkip = {},
+                    onExactAlarmsContinue = {},
+                    onExactAlarmsSkip = {},
+                    onFullScreenAlarmsContinue = {},
+                    onFullScreenAlarmsSkip = {},
+                    onNext = {},
+                    onBack = {},
+                    onComplete = {},
+                    canAdvance = true
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("This lets Android open Suntime Alerts as an alarm screen instead of only showing a banner.").assertExistsCompat()
+        composeTestRule.onNodeWithText("Tap Continue to open full-screen alarm settings.").assertExistsCompat()
     }
 
     @Test

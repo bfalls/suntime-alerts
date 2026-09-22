@@ -49,10 +49,13 @@ fun OnboardingScreen(
     onCitySelected: (City) -> Unit,
     notificationsPermissionRequired: Boolean,
     exactAlarmPermissionRequired: Boolean,
+    fullScreenAlarmPermissionRequired: Boolean,
     onNotificationsContinue: () -> Unit,
     onNotificationsSkip: () -> Unit,
     onExactAlarmsContinue: () -> Unit,
     onExactAlarmsSkip: () -> Unit,
+    onFullScreenAlarmsContinue: () -> Unit,
+    onFullScreenAlarmsSkip: () -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit,
     onComplete: () -> Unit,
@@ -95,6 +98,14 @@ fun OnboardingScreen(
                                         Text("Continue")
                                     }
                                 }
+                                OnboardingStep.FULL_SCREEN_ALARMS -> {
+                                    OutlinedButton(onClick = onFullScreenAlarmsSkip) {
+                                        Text("Skip")
+                                    }
+                                    Button(onClick = onFullScreenAlarmsContinue) {
+                                        Text("Continue")
+                                    }
+                                }
                                 else -> {
                                     Button(
                                         onClick = { if (state.step == OnboardingStep.SUMMARY) onComplete() else onNext() },
@@ -134,6 +145,10 @@ fun OnboardingScreen(
                         title = "Alarms & reminders",
                         subtitle = "Setup"
                     )
+                    OnboardingStep.FULL_SCREEN_ALARMS -> OnboardingBanner(
+                        title = "Full-screen alarms",
+                        subtitle = "Setup"
+                    )
                     OnboardingStep.SUMMARY -> OnboardingBanner(
                         title = "Summary",
                         subtitle = "Setup"
@@ -159,6 +174,10 @@ fun OnboardingScreen(
                     OnboardingStep.EXACT_ALARMS -> ExactAlarmsStep(
                         state = state,
                         permissionRequired = exactAlarmPermissionRequired
+                    )
+                    OnboardingStep.FULL_SCREEN_ALARMS -> FullScreenAlarmsStep(
+                        state = state,
+                        permissionRequired = fullScreenAlarmPermissionRequired
                     )
                     OnboardingStep.SUMMARY -> SummaryStep(state)
                 }
@@ -345,6 +364,33 @@ private fun ExactAlarmsStep(
         )
         Text(
             "To trigger alerts at the right time, Suntime Alerts needs exact alarm access. We'll open the Alarms & reminders settings so you can allow it. If exact alarms stay off, the app will not treat alerts as reliably scheduled."
+        )
+        if (!permissionRequired) {
+            Text("Not required on this Android version or already allowed.")
+        }
+    }
+}
+
+@Composable
+private fun FullScreenAlarmsStep(
+    state: OnboardingState,
+    permissionRequired: Boolean
+) {
+    val readiness = state.alarmReadiness
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        CapabilityCard(
+            title = "Full-screen alarms",
+            ready = readiness?.fullScreenIntentReady == true,
+            reason = "This lets Android open Suntime Alerts as an alarm screen instead of only showing a banner.",
+            action = if (permissionRequired) {
+                "Tap Continue to open full-screen alarm settings."
+            } else {
+                null
+            },
+            fallback = "You can skip this, but alarms may appear only as a temporary banner on Android 14 or newer."
+        )
+        Text(
+            "Android controls full-screen alarm access in Special app access. Suntime Alerts cannot show a normal permission dialog for it, so we open the system settings page where you can allow full-screen alarms."
         )
         if (!permissionRequired) {
             Text("Not required on this Android version or already allowed.")

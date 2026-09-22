@@ -380,6 +380,7 @@ class SunEventReceiver : BroadcastReceiver() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(fullScreenIntent)
             .setDeleteIntent(dismissPendingIntent)
+            .addAction(R.drawable.ic_dialog_info, "Dismiss", dismissPendingIntent)
             .apply {
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                     if (parsedSoundUri != null) {
@@ -387,11 +388,10 @@ class SunEventReceiver : BroadcastReceiver() {
                     }
                     setVibrate(vibrationPattern)
                 }
-                if (canUseFullScreenIntent) {
-                    setFullScreenIntent(fullScreenIntent, true)
-                }
+                setFullScreenIntent(fullScreenIntent, true)
             }
-            .setAutoCancel(true)
+            .setOngoing(true)
+            .setAutoCancel(false)
             .build()
 
         NotificationManagerCompat.from(context).notify(alarmId.hashCode(), notification)

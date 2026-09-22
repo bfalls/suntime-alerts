@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
             var permissionRequestOrigin by remember { mutableStateOf<PermissionRequestOrigin?>(null) }
             var autoLocationPermissionRequested by rememberSaveable { mutableStateOf(false) }
             var pendingExactAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
+            var pendingFullScreenAlarmPermissionRequest by rememberSaveable { mutableStateOf(false) }
             var showSettings by rememberSaveable { mutableStateOf(false) }
             val openAppSettings = {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -210,6 +211,12 @@ class MainActivity : ComponentActivity() {
                             onboardingViewModel.handleExactAlarmSettingsResult()
                             homeViewModel.handleExactAlarmSettingsResult()
                             pendingExactAlarmPermissionRequest = false
+                        }
+                        if (pendingFullScreenAlarmPermissionRequest) {
+                            onboardingViewModel.handleFullScreenAlarmSettingsResult()
+                            homeViewModel.refresh()
+                            settingsViewModel.refreshReadiness()
+                            pendingFullScreenAlarmPermissionRequest = false
                         }
                     }
                 }
@@ -360,6 +367,7 @@ class MainActivity : ComponentActivity() {
                                 onCitySelected = onboardingViewModel::selectCity,
                                 notificationsPermissionRequired = onboardingState.alarmReadiness?.notificationsReady == false,
                                 exactAlarmPermissionRequired = onboardingState.alarmReadiness?.exactAlarmReady == false,
+                                fullScreenAlarmPermissionRequired = onboardingState.alarmReadiness?.fullScreenIntentReady == false,
                                 onNotificationsContinue = {
                                     val readiness = onboardingState.alarmReadiness
                                     if (readiness?.notificationsReady == true) {
@@ -409,6 +417,28 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onExactAlarmsSkip = {
                                     pendingExactAlarmPermissionRequest = false
+                                    onboardingViewModel.nextStep()
+                                },
+                                onFullScreenAlarmsContinue = {
+                                    val readiness = onboardingState.alarmReadiness
+                                    if (readiness?.fullScreenIntentReady == true) {
+                                        onboardingViewModel.nextStep()
+                                        return@OnboardingScreen
+                                    }
+                                    if (pendingFullScreenAlarmPermissionRequest) {
+                                        return@OnboardingScreen
+                                    }
+                                    if (
+                                        readiness?.repairActions?.contains(
+                                            AlarmRepairAction.OPEN_FULL_SCREEN_INTENT_SETTINGS
+                                        ) == true
+                                    ) {
+                                        pendingFullScreenAlarmPermissionRequest = true
+                                        openFullScreenIntentSettings()
+                                    }
+                                },
+                                onFullScreenAlarmsSkip = {
+                                    pendingFullScreenAlarmPermissionRequest = false
                                     onboardingViewModel.nextStep()
                                 },
                                 onNext = onboardingViewModel::nextStep,

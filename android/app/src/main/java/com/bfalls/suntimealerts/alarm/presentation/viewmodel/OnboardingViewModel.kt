@@ -44,7 +44,7 @@ data class OnboardingState(
     val alarmReadiness: AlarmReadiness? = null
 )
 
-enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, EXACT_ALARMS, SUMMARY }
+enum class OnboardingStep { WELCOME, LOCATION, NOTIFICATIONS, EXACT_ALARMS, FULL_SCREEN_ALARMS, SUMMARY }
 
 enum class PermissionRequestOrigin { AUTOMATIC, USER }
 
@@ -128,6 +128,15 @@ class OnboardingViewModel(
         viewModelScope.launch {
             val readiness = refreshReadinessInternal()
             if (_state.value.step == OnboardingStep.EXACT_ALARMS && readiness.exactAlarmReady) {
+                nextStep()
+            }
+        }
+    }
+
+    fun handleFullScreenAlarmSettingsResult() {
+        viewModelScope.launch {
+            val readiness = refreshReadinessInternal()
+            if (_state.value.step == OnboardingStep.FULL_SCREEN_ALARMS && readiness.fullScreenIntentReady) {
                 nextStep()
             }
         }
@@ -416,6 +425,7 @@ private val orderedSteps = listOf(
     OnboardingStep.LOCATION,
     OnboardingStep.NOTIFICATIONS,
     OnboardingStep.EXACT_ALARMS,
+    OnboardingStep.FULL_SCREEN_ALARMS,
     OnboardingStep.SUMMARY
 )
 

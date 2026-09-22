@@ -95,6 +95,43 @@ class OnboardingViewModelTest {
         viewModel.handleExactAlarmSettingsResult()
         advanceUntilIdle()
 
+        assertEquals(OnboardingStep.FULL_SCREEN_ALARMS, viewModel.state.value.step)
+    }
+
+    @Test
+    fun fullScreenAlarmSettingsResultDoesNotAdvanceWhenReadinessIsStillMissing() = runTest {
+        val readinessProvider = FakeAlarmReadinessProvider(
+            readiness(fullScreenIntentReady = false)
+        )
+        val viewModel = createViewModel(readinessProvider)
+        advanceUntilIdle()
+        viewModel.nextStep()
+        viewModel.nextStep()
+        viewModel.nextStep()
+        viewModel.nextStep()
+
+        viewModel.handleFullScreenAlarmSettingsResult()
+        advanceUntilIdle()
+
+        assertEquals(OnboardingStep.FULL_SCREEN_ALARMS, viewModel.state.value.step)
+    }
+
+    @Test
+    fun fullScreenAlarmSettingsResultAdvancesWhenReadinessIsGranted() = runTest {
+        val readinessProvider = FakeAlarmReadinessProvider(
+            readiness(fullScreenIntentReady = false)
+        )
+        val viewModel = createViewModel(readinessProvider)
+        advanceUntilIdle()
+        viewModel.nextStep()
+        viewModel.nextStep()
+        viewModel.nextStep()
+        viewModel.nextStep()
+
+        readinessProvider.current = readiness(fullScreenIntentReady = true)
+        viewModel.handleFullScreenAlarmSettingsResult()
+        advanceUntilIdle()
+
         assertEquals(OnboardingStep.SUMMARY, viewModel.state.value.step)
     }
 
