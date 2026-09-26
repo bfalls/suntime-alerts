@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 private const val FEEDBACK_EMAIL_ADDRESS = "suntimealerts@gmail.com"
+private const val FEEDBACK_EMAIL_SUBJECT = "Suntime Alerts alpha feedback"
 
 @Composable
 internal fun FeedbackDialog(
@@ -56,22 +57,20 @@ internal fun FeedbackDialog(
                         message = feedbackMessage.trim(),
                         context = context
                     )
-                    val intent = Intent(
-                        Intent.ACTION_SENDTO,
-                        Uri.parse("mailto:$FEEDBACK_EMAIL_ADDRESS")
-                    ).apply {
-                        putExtra(Intent.EXTRA_SUBJECT, "Suntime Alerts alpha feedback")
+                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = buildFeedbackMailtoUri(
+                            subject = FEEDBACK_EMAIL_SUBJECT,
+                            body = body
+                        )
+                        putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL_ADDRESS))
+                        putExtra(Intent.EXTRA_SUBJECT, FEEDBACK_EMAIL_SUBJECT)
                         putExtra(Intent.EXTRA_TEXT, body)
                     }
 
-                    if (intent.resolveActivity(context.packageManager) != null) {
-                        try {
-                            context.startActivity(intent)
-                            onDismiss()
-                        } catch (_: ActivityNotFoundException) {
-                            onEmailUnavailable()
-                        }
-                    } else {
+                    try {
+                        context.startActivity(intent)
+                        onDismiss()
+                    } catch (_: ActivityNotFoundException) {
                         onEmailUnavailable()
                     }
                 }
@@ -86,6 +85,15 @@ internal fun FeedbackDialog(
         }
     )
 }
+
+private fun buildFeedbackMailtoUri(
+    subject: String,
+    body: String
+): Uri = Uri.parse(
+    "mailto:$FEEDBACK_EMAIL_ADDRESS" +
+        "?subject=${Uri.encode(subject)}" +
+        "&body=${Uri.encode(body)}"
+)
 
 private fun buildFeedbackBody(
     message: String,

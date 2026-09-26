@@ -64,6 +64,7 @@ import com.bfalls.suntimealerts.utils.hasNotificationPermission
 import kotlinx.coroutines.launch
 
 private const val FEEDBACK_EMAIL_ADDRESS = "suntimealerts@gmail.com"
+private const val FEEDBACK_EMAIL_SUBJECT = "Suntime Alerts alpha feedback"
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -474,24 +475,20 @@ fun SettingsScreen(
                             message = feedbackMessage.trim(),
                             context = context
                         )
-                        val intent = Intent(
-                            Intent.ACTION_SENDTO,
-                            Uri.parse("mailto:$FEEDBACK_EMAIL_ADDRESS")
-                        ).apply {
-                            putExtra(Intent.EXTRA_SUBJECT, "Suntime Alerts alpha feedback")
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = buildFeedbackMailtoUri(
+                                subject = FEEDBACK_EMAIL_SUBJECT,
+                                body = body
+                            )
+                            putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL_ADDRESS))
+                            putExtra(Intent.EXTRA_SUBJECT, FEEDBACK_EMAIL_SUBJECT)
                             putExtra(Intent.EXTRA_TEXT, body)
                         }
-                        val canHandle = intent.resolveActivity(context.packageManager) != null
-                        if (canHandle) {
-                            try {
-                                context.startActivity(intent)
-                                showFeedbackDialog = false
-                            } catch (_: ActivityNotFoundException) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("No email app is available on this device.")
-                                }
-                            }
-                        } else {
+
+                        try {
+                            context.startActivity(intent)
+                            showFeedbackDialog = false
+                        } catch (_: ActivityNotFoundException) {
                             scope.launch {
                                 snackbarHostState.showSnackbar("No email app is available on this device.")
                             }
@@ -528,6 +525,15 @@ private fun PermissionStatusRow(
         }
     }
 }
+
+private fun buildFeedbackMailtoUri(
+    subject: String,
+    body: String
+): Uri = Uri.parse(
+    "mailto:$FEEDBACK_EMAIL_ADDRESS" +
+        "?subject=${Uri.encode(subject)}" +
+        "&body=${Uri.encode(body)}"
+)
 
 private fun buildFeedbackBody(
     message: String,

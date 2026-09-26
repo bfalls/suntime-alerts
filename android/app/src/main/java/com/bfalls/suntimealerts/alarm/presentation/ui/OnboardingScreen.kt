@@ -381,13 +381,13 @@ private fun FullScreenAlarmsStep(
         CapabilityCard(
             title = "Full-screen alarms",
             ready = readiness?.fullScreenIntentReady == true,
-            reason = "This lets Android open Suntime Alerts as an alarm screen instead of only showing a banner.",
+            reason = "This lets Android open Suntime Alerts as an alarm screen while still respecting notification settings.",
             action = if (permissionRequired) {
                 "Tap Continue to open full-screen alarm settings."
             } else {
                 null
             },
-            fallback = "You can skip this, but alarms may appear only as a temporary banner on Android 14 or newer."
+            fallback = "You can skip this, but Android may only use the notification category style configured for this app."
         )
         Text(
             "Android controls full-screen alarm access in Special app access. Suntime Alerts cannot show a normal permission dialog for it, so we open the system settings page where you can allow full-screen alarms."

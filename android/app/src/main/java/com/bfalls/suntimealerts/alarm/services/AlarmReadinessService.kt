@@ -178,12 +178,18 @@ class AlarmReadinessService(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        SunEventReceiver.pruneStaleAlarmChannels(
+            context = context,
+            currentAlarmIds = settings.alarms.map { it.id }.toSet()
+        )
         settings.alarms
             .filter { it.enabled }
             .forEach { alarm ->
                 SunEventReceiver.ensureChannelExists(
                     context = context,
                     alarmId = alarm.id,
+                    eventType = alarm.type,
+                    label = alarm.label,
                     soundUri = alarm.soundUri,
                     vibrate = alarm.vibrate ?: true
                 )

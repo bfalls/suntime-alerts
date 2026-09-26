@@ -206,7 +206,7 @@ class ReadinessFlowScreenTest {
             }
         }
 
-        composeTestRule.onNodeWithText("This lets Android open Suntime Alerts as an alarm screen instead of only showing a banner.").assertExistsCompat()
+        composeTestRule.onNodeWithText("This lets Android open Suntime Alerts as an alarm screen while still respecting notification settings.").assertExistsCompat()
         composeTestRule.onNodeWithText("Tap Continue to open full-screen alarm settings.").assertExistsCompat()
     }
 
@@ -278,7 +278,7 @@ class ReadinessFlowScreenTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Full-screen alarm pop-ups are disabled, so alarms will fall back to a high-priority notification instead of opening over the lock screen.").assertExistsCompat()
+        composeTestRule.onNodeWithText("Full-screen alarm screens are disabled, so Android will use this app's notification category settings instead of opening over the lock screen.").assertExistsCompat()
         composeTestRule.onNodeWithText("Full-screen alarms").assertExistsCompat()
     }
 

@@ -165,7 +165,7 @@ fun HomeScreen(
 
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.refreshSunMoonPositions()
+            viewModel.refresh()
             while (true) {
                 delay(15 * 60 * 1000L)
                 viewModel.refreshSunMoonPositions()
@@ -437,7 +437,7 @@ private fun AlarmReadinessBanner(
                     !readiness.bootRescheduleReady ->
                         "Alarm recovery after device restart is degraded until a usable location is saved."
                     !readiness.fullScreenIntentReady ->
-                        "Full-screen alarm pop-ups are disabled, so alarms will fall back to a high-priority notification instead of opening over the lock screen."
+                        "Full-screen alarm screens are disabled, so Android will use this app's notification category settings instead of opening over the lock screen."
                     !readiness.exactAlarmReady ->
                         "Exact alarm access is off, so Android will not schedule reliable sunrise and sunset alerts."
                     !readiness.notificationsReady ->
@@ -585,7 +585,7 @@ private fun initialAlarmValues(alarm: SunAlarm?, defaultType: SunEventType): Ala
         minutes = abs(offset) % 60,
         label = alarm?.label ?: "",
         enabled = alarm?.enabled ?: true,
-        recurrenceMask = alarm?.recurrenceDays ?: if (alarm == null) 0 else ALL_DAYS_MASK,
+        recurrenceMask = alarm?.recurrenceDays ?: 0,
         soundUriValue = alarm?.soundUri,
         vibrate = alarm?.vibrate ?: true
     )
