@@ -91,9 +91,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -125,9 +126,12 @@ import com.bfalls.suntimealerts.alarm.domain.model.includesDay
 import com.bfalls.suntimealerts.alarm.domain.model.toBitMask
 import com.bfalls.suntimealerts.alarm.services.AlarmRepairAction
 import com.bfalls.suntimealerts.alarm.domain.service.MoonArcPositionCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.MoonPhaseMask
 import com.bfalls.suntimealerts.alarm.domain.service.MoonXY
+import com.bfalls.suntimealerts.alarm.domain.service.SkyBackgroundModel
 import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunXY
+import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -146,6 +150,12 @@ import kotlin.random.Random
 
 @VisibleForTesting
 val MoonVisibleKey = SemanticsPropertyKey<Boolean>("MoonVisible")
+
+private const val MOON_BRIGHTNESS_SCALE = 1.2f
+private const val SKY_HORIZON_HAZE_SCALE = 0.75f
+private const val SKY_HILL_SHADOW_AMOUNT = 0.25f
+private const val SKY_GROUND_GRADIENT_AMOUNT = 0.75f
+private const val SKY_CLOUD_PATCH_AMOUNT = 0.18f
 
 private fun Modifier.moonVisible(isVisible: Boolean): Modifier = semantics {
     this[MoonVisibleKey] = isVisible
@@ -253,6 +263,7 @@ fun HomeScreenContent(
                     moonMaxAltDeg = state.moonMaxAltDeg,
                     moonIllumination01 = state.moonIllumination01,
                     moonIsWaxing = state.moonIsWaxing,
+                    moonLitDirectionRadians = state.moonLitDirectionRadians,
                     coordinateUsed = state.coordinateUsed,
                     sunTimesResolved = readyToRender,
                     now = state.now,
@@ -1128,6 +1139,7 @@ private fun SkyTopBar(
     moonMaxAltDeg: Double,
     moonIllumination01: Double,
     moonIsWaxing: Boolean,
+    moonLitDirectionRadians: Float?,
     coordinateUsed: Coordinate?,
     sunTimesResolved: Boolean,
     now: ZonedDateTime,
@@ -1147,6 +1159,7 @@ private fun SkyTopBar(
             moonMaxAltDeg = moonMaxAltDeg,
             moonIllumination01 = moonIllumination01,
             moonIsWaxing = moonIsWaxing,
+            moonLitDirectionRadians = moonLitDirectionRadians,
             coordinateUsed = coordinateUsed,
             sunTimesResolved = sunTimesResolved,
             now = now,
@@ -1181,6 +1194,7 @@ private fun SkyAppBarBackground(
     moonMaxAltDeg: Double,
     moonIllumination01: Double,
     moonIsWaxing: Boolean,
+    moonLitDirectionRadians: Float?,
     coordinateUsed: Coordinate?,
     sunTimesResolved: Boolean,
     now: ZonedDateTime,
@@ -1246,68 +1260,46 @@ private fun SkyAppBarBackground(
                 skyFacingMode = skyFacingMode
             )
         }
-        val isDay = sunPosition.isDay && hasSunTimes
-        val gradient = when {
-            isDay -> {
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF64B5F6),
-                        Color(0xFFBBDEFB)
-                    )
-                )
-            }
-
-            hasSunTimes -> {
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF0D1B2A),
-                        Color(0xFF001219)
-                    )
-                )
-            }
-
-            else -> {
-                Brush.verticalGradient(
-                    listOf(
-                        placeholderTop,
-                        placeholderBottom
-                    )
-                )
-            }
+        val sunAltitudeDeg = coordinateUsed?.let {
+            SunTimesCalculator.sunAltAz(now, it.latitude, it.longitude).altitudeDeg
         }
-        drawRect(brush = gradient, size = size)
-
-        if (hasSunTimes && !isDay) {
-            drawStars(horizonY, now.toLocalDate().toEpochDay())
+        val skyBackground = SkyBackgroundModel.compute(sunAltitudeDeg, hasSunTimes)
+        val gradientStops = if (hasSunTimes) {
+            skyBackground.gradientStops.map { stop -> stop.position to Color(stop.color) }.toTypedArray()
+        } else {
+            arrayOf(0f to placeholderTop, 1f to placeholderBottom)
         }
-
-        drawLine(
-            color = Color.White.copy(alpha = 0.25f),
-            start = Offset(0f, horizonY),
-            end = Offset(size.width, horizonY),
-            strokeWidth = 2f
+        drawRect(
+            brush = Brush.verticalGradient(*gradientStops),
+            size = size
         )
 
-        val moonShouldDraw = moonWindowComplete && moonPosition.isUp
-        if (moonShouldDraw) {
-            val moonBaseDiameter = size.minDimension * 0.10f * bodyScale
-            val minMoonSize = 20.dp.toPx() * bodyScale
-            val maxMoonSize = 36.dp.toPx() * bodyScale
-            val moonDiameter = moonBaseDiameter.coerceIn(minMoonSize, maxMoonSize)
-            val moonRadius = moonDiameter / 2f
-            val topLeft = Offset(moonPosition.x - moonRadius, moonPosition.y - moonRadius)
-            val moonAlpha = if (isDay) 0.65f else 0.95f
-            drawMoonPhase(
-                moonImage = moonImage,
-                topLeft = topLeft,
-                diameter = moonDiameter,
-                alpha = moonAlpha,
-                illumination01 = moonIllumination01.toFloat(),
-                isWaxing = moonIsWaxing
+        skyBackground.sunGlow?.let { glow ->
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(glow.color).copy(alpha = glow.alpha),
+                        Color(glow.color).copy(alpha = glow.alpha * 0.32f),
+                        Color.Transparent
+                    ),
+                    center = Offset(sunPosition.x, sunPosition.y),
+                    radius = size.minDimension * glow.radiusScale
+                ),
+                radius = size.minDimension * glow.radiusScale,
+                center = Offset(sunPosition.x, sunPosition.y)
             )
         }
 
-        if (isDay) {
+        if (hasSunTimes && skyBackground.starAlpha > 0f) {
+            drawStars(
+                horizonY = horizonY,
+                seed = now.toLocalDate().toEpochDay(),
+                alphaMultiplier = skyBackground.starAlpha
+            )
+        }
+        drawCloudPatches(horizonY)
+
+        if (sunPosition.isDay && hasSunTimes) {
             val sunBaseDiameter = size.minDimension * 0.12f * bodyScale
             val minSunSize = 24.dp.toPx() * bodyScale
             val maxSunSize = 40.dp.toPx() * bodyScale
@@ -1320,6 +1312,28 @@ private fun SkyAppBarBackground(
                 dstSize = IntSize(sunDiameter.roundToInt(), sunDiameter.roundToInt())
             )
         }
+
+        val moonShouldDraw = moonWindowComplete && moonPosition.isUp
+        if (moonShouldDraw) {
+            val moonBaseDiameter = size.minDimension * 0.10f * bodyScale
+            val minMoonSize = 20.dp.toPx() * bodyScale
+            val maxMoonSize = 36.dp.toPx() * bodyScale
+            val moonDiameter = moonBaseDiameter.coerceIn(minMoonSize, maxMoonSize)
+            val moonRadius = moonDiameter / 2f
+            val topLeft = Offset(moonPosition.x - moonRadius, moonPosition.y - moonRadius)
+            val moonAlpha = 0.65f + 0.30f * skyBackground.starAlpha
+            drawMoonPhase(
+                moonImage = moonImage,
+                topLeft = topLeft,
+                diameter = moonDiameter,
+                alpha = moonAlpha,
+                illumination01 = moonIllumination01.toFloat(),
+                isWaxing = moonIsWaxing,
+                litDirectionRadians = moonLitDirectionRadians
+            )
+        }
+
+        drawSkyLandscape(horizonY, skyBackground)
     }
 }
 
@@ -1329,48 +1343,68 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMoonPhase(
     diameter: Float,
     alpha: Float,
     illumination01: Float,
-    isWaxing: Boolean
+    isWaxing: Boolean,
+    litDirectionRadians: Float?
 ) {
     val circleRect = Rect(topLeft, Size(diameter, diameter))
     val circlePath = Path().apply { addOval(circleRect) }
+    val clippedIllumination = illumination01.coerceIn(0f, 1f)
     val litPath = buildMoonLitPath(
         bounds = circleRect,
-        illumination01 = illumination01.coerceIn(0f, 1f),
-        isWaxing = isWaxing
+        illumination01 = clippedIllumination,
+        isWaxing = isWaxing,
+        litDirectionRadians = litDirectionRadians
+    )
+    val moonBrightnessFilter = ColorFilter.colorMatrix(
+        ColorMatrix().apply {
+            setToScale(
+                redScale = MOON_BRIGHTNESS_SCALE,
+                greenScale = MOON_BRIGHTNESS_SCALE,
+                blueScale = MOON_BRIGHTNESS_SCALE,
+                alphaScale = 1f
+            )
+        }
     )
 
     clipPath(circlePath) {
-        drawImage(
-            image = moonImage,
-            dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt()),
-            dstSize = IntSize(diameter.roundToInt(), diameter.roundToInt()),
-            alpha = alpha * 0.28f
-        )
-        drawRect(
-            color = Color.Black.copy(alpha = 0.45f * alpha),
-            topLeft = topLeft,
-            size = Size(diameter, diameter)
-        )
+        MoonPhaseMask.softEdgeLayers(clippedIllumination).forEach { layer ->
+            val softPath = buildMoonLitPath(
+                bounds = circleRect,
+                illumination01 = layer.illumination01,
+                isWaxing = isWaxing,
+                litDirectionRadians = litDirectionRadians
+            )
+            clipPath(softPath) {
+                drawImage(
+                    image = moonImage,
+                    dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt()),
+                    dstSize = IntSize(diameter.roundToInt(), diameter.roundToInt()),
+                    alpha = alpha * layer.alphaMultiplier,
+                    colorFilter = moonBrightnessFilter
+                )
+            }
+        }
         clipPath(litPath) {
             drawImage(
                 image = moonImage,
                 dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt()),
                 dstSize = IntSize(diameter.roundToInt(), diameter.roundToInt()),
-                alpha = alpha
+                alpha = alpha,
+                colorFilter = moonBrightnessFilter
             )
         }
         drawIntoCanvas { canvas ->
             canvas.saveLayer(circleRect, androidx.compose.ui.graphics.Paint())
             drawPath(
                 path = litPath,
-                color = Color.White.copy(alpha = 0.12f * alpha)
+                color = Color.White.copy(alpha = 0.18f * alpha)
             )
             drawRect(
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.10f * alpha),
+                        Color.White.copy(alpha = 0.16f * alpha),
                         Color.Transparent,
-                        Color.Black.copy(alpha = 0.12f * alpha)
+                        Color.Black.copy(alpha = 0.10f * alpha)
                     ),
                     startY = topLeft.y,
                     endY = topLeft.y + diameter
@@ -1387,39 +1421,23 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMoonPhase(
 private fun buildMoonLitPath(
     bounds: Rect,
     illumination01: Float,
-    isWaxing: Boolean
+    isWaxing: Boolean,
+    litDirectionRadians: Float?
 ): Path {
-    val radius = bounds.width / 2f
-    val centerX = bounds.center.x
-    val centerY = bounds.center.y
-    val phaseDelta = (illumination01 - 0.5f) * 2f
-    val ovalWidth = (radius * 2f * abs(phaseDelta)).coerceAtLeast(0.001f)
-    val ovalRect = Rect(
-        left = centerX - ovalWidth / 2f,
-        top = bounds.top,
-        right = centerX + ovalWidth / 2f,
-        bottom = bounds.bottom
-    )
-    val fullDisc = Path().apply { addOval(bounds) }
-    val halfDisc = Path().apply {
-        addRect(
-            Rect(
-                left = if (isWaxing) centerX else bounds.left,
-                top = bounds.top,
-                right = if (isWaxing) bounds.right else centerX,
-                bottom = bounds.bottom
-            )
-        )
-        addOval(bounds)
-    }
-    val halfMoon = Path.combine(PathOperation.Intersect, fullDisc, halfDisc)
-    val phaseOval = Path().apply { addOval(ovalRect) }
-
-    return when {
-        illumination01 <= 0f -> Path()
-        illumination01 >= 1f -> fullDisc
-        illumination01 < 0.5f -> Path.combine(PathOperation.Difference, halfMoon, phaseOval)
-        else -> Path.combine(PathOperation.Union, halfMoon, phaseOval)
+    val points = MoonPhaseMask.litDiscPolygon(illumination01, isWaxing, litDirectionRadians)
+    return Path().apply {
+        points.forEachIndexed { index, point ->
+            val x = bounds.left + point.x01 * bounds.width
+            val y = bounds.top + point.y01 * bounds.height
+            if (index == 0) {
+                moveTo(x, y)
+            } else {
+                lineTo(x, y)
+            }
+        }
+        if (points.isNotEmpty()) {
+            close()
+        }
     }
 }
 
@@ -1438,9 +1456,163 @@ private fun calculateMoonArcHeight(
     return desiredArcHeight.coerceIn(minArcHeight, maxArcHeight)
 }
 
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSkyLandscape(
+    horizonY: Float,
+    skyBackground: com.bfalls.suntimealerts.alarm.domain.service.SkyBackgroundSpec
+) {
+    drawHillLayer(
+        horizonY = horizonY,
+        profile = SkyBackgroundModel.farHillProfile(),
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color(skyBackground.landscape.farHillColor),
+                Color(skyBackground.landscape.farHillColor)
+            )
+        ),
+        verticalShift = size.height * 0.018f
+    )
+    drawHillLayer(
+        horizonY = horizonY,
+        profile = SkyBackgroundModel.nearHillProfile(),
+        brush = buildGroundGradientBrush(
+            horizonY = horizonY,
+            color = Color(skyBackground.landscape.groundColor)
+        ),
+        verticalShift = size.height * 0.045f
+    )
+    drawHillLayer(
+        horizonY = horizonY,
+        profile = SkyBackgroundModel.nearHillProfile(),
+        brush = buildGroundGradientBrush(
+            horizonY = horizonY,
+            color = Color(skyBackground.landscape.nearHillColor)
+        ),
+        verticalShift = 0f
+    )
+    drawHillShadow(horizonY)
+    val hazeAlpha = skyBackground.landscape.hazeAlpha * SKY_HORIZON_HAZE_SCALE
+    if (hazeAlpha > 0f) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    Color(skyBackground.landscape.hazeColor).copy(alpha = hazeAlpha),
+                    Color.Transparent
+                ),
+                startY = horizonY - size.height * 0.08f,
+                endY = horizonY + size.height * 0.10f
+            ),
+            topLeft = Offset(0f, horizonY - size.height * 0.08f),
+            size = Size(size.width, size.height * 0.18f)
+        )
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHillLayer(
+    horizonY: Float,
+    profile: List<com.bfalls.suntimealerts.alarm.domain.service.SkyHorizonPoint>,
+    brush: Brush,
+    verticalShift: Float
+) {
+    if (profile.isEmpty()) return
+    val path = Path()
+    val points = profile.map { point ->
+        Offset(
+            x = point.x01 * size.width,
+            y = horizonY + point.yOffset01 * size.height + verticalShift
+        )
+    }
+    path.moveTo(points.first().x, points.first().y)
+    if (points.size == 1) {
+        path.lineTo(points.first().x, points.first().y)
+    } else {
+        for (index in 1 until points.lastIndex) {
+            val control = points[index]
+            val next = points[index + 1]
+            val end = Offset(
+                x = (control.x + next.x) / 2f,
+                y = (control.y + next.y) / 2f
+            )
+            path.quadraticTo(control.x, control.y, end.x, end.y)
+        }
+        val penultimate = points[points.lastIndex - 1]
+        val last = points.last()
+        path.quadraticTo(penultimate.x, penultimate.y, last.x, last.y)
+    }
+    path.lineTo(size.width * 1.05f, size.height)
+    path.lineTo(size.width * -0.05f, size.height)
+    path.close()
+    drawPath(path = path, brush = brush)
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.buildGroundGradientBrush(
+    horizonY: Float,
+    color: Color
+): Brush {
+    return Brush.verticalGradient(
+        colors = listOf(
+            color.scaleRgb(1f + 0.18f * SKY_GROUND_GRADIENT_AMOUNT),
+            color.scaleRgb(1f - 0.28f * SKY_GROUND_GRADIENT_AMOUNT)
+        ),
+        startY = horizonY,
+        endY = size.height
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHillShadow(horizonY: Float) {
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.Black.copy(alpha = 0.13f * SKY_HILL_SHADOW_AMOUNT),
+                Color.Black.copy(alpha = 0.06f * SKY_HILL_SHADOW_AMOUNT),
+                Color.Transparent
+            ),
+            startY = horizonY,
+            endY = size.height
+        ),
+        topLeft = Offset(0f, horizonY),
+        size = Size(size.width, size.height - horizonY)
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCloudPatches(horizonY: Float) {
+    if (SKY_CLOUD_PATCH_AMOUNT <= 0f) return
+    val random = Random(20261003L)
+    repeat((18 * SKY_CLOUD_PATCH_AMOUNT).roundToInt().coerceAtLeast(1)) {
+        val patchWidth = size.width * (0.14f + random.nextFloat() * 0.18f)
+        val patchHeight = horizonY * (0.035f + random.nextFloat() * 0.055f)
+        val x = random.nextFloat() * (size.width + patchWidth) - patchWidth * 0.5f
+        val y = horizonY * (0.10f + random.nextFloat() * 0.58f)
+        val alpha = (0.045f + random.nextFloat() * 0.075f) * SKY_CLOUD_PATCH_AMOUNT
+        drawOval(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = alpha),
+                    Color(0xFFF5FAFF).copy(alpha = alpha * 0.34f),
+                    Color.Transparent
+                ),
+                center = Offset(x + patchWidth * 0.5f, y + patchHeight * 0.5f),
+                radius = patchWidth * 0.55f
+            ),
+            topLeft = Offset(x, y),
+            size = Size(patchWidth, patchHeight)
+        )
+    }
+}
+
+private fun Color.scaleRgb(scale: Float): Color {
+    return Color(
+        red = (red * scale).coerceIn(0f, 1f),
+        green = (green * scale).coerceIn(0f, 1f),
+        blue = (blue * scale).coerceIn(0f, 1f),
+        alpha = alpha
+    )
+}
+
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStars(
     horizonY: Float,
-    seed: Long
+    seed: Long,
+    alphaMultiplier: Float
 ) {
     val random = Random(seed)
     repeat(60) {
@@ -1448,7 +1620,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStars(
         val y = random.nextFloat() * (horizonY * 0.9f)
         val radius = (random.nextDouble(1.0, 3.0)).toFloat()
         drawCircle(
-            color = Color.White.copy(alpha = random.nextFloat().coerceIn(0.3f, 0.8f)),
+            color = Color.White.copy(alpha = random.nextFloat().coerceIn(0.3f, 0.8f) * alphaMultiplier),
             radius = radius,
             center = Offset(x, y)
         )

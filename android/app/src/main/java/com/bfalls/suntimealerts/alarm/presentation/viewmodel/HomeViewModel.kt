@@ -7,6 +7,7 @@ import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.data.SunScheduler
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
+import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
@@ -14,6 +15,7 @@ import com.bfalls.suntimealerts.alarm.domain.model.UserSettings
 import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
 import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.alarm.domain.service.MoonEphemeris
+import com.bfalls.suntimealerts.alarm.domain.service.MoonPhaseMask
 import com.bfalls.suntimealerts.alarm.domain.service.MoonTimesCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator.SunTimes
@@ -57,6 +59,7 @@ class HomeViewModel(
         val moonMaxAltDeg: Double = 0.0,
         val moonIllumination01: Double = 0.0,
         val moonIsWaxing: Boolean = true,
+        val moonLitDirectionRadians: Float? = null,
         val now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault()),
         val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
         val alarmReadiness: AlarmReadiness? = null,
@@ -243,6 +246,11 @@ class HomeViewModel(
             MoonTimesCalculator.computeWindow(now, it.latitude, it.longitude)
         }
         val moonPhase = MoonEphemeris.moonPhase(now)
+        val moonLitDirectionRadians = coordinate?.let {
+            val sunAltAz = SunTimesCalculator.sunAltAz(now, it.latitude, it.longitude)
+            val moonAltAz = MoonEphemeris.moonAltAz(now, it.latitude, it.longitude)
+            MoonPhaseMask.litDirectionRadians(sunAltAz, moonAltAz, SkyFacingMode.SOUTH_FACING)
+        }
         val sunriseTime = sunTimes?.sunrise ?: _state.value.sunriseTime ?: fallbackSunTimes.sunrise
         val sunsetTime = sunTimes?.sunset ?: _state.value.sunsetTime ?: fallbackSunTimes.sunset
         val sunriseAlarms = alarms?.filter { it.type == SunEventType.SUNRISE }?.sortedBy { it.offsetMinutes }
@@ -264,6 +272,7 @@ class HomeViewModel(
                 moonMaxAltDeg = moonWindow?.maxAltDeg ?: current.moonMaxAltDeg,
                 moonIllumination01 = moonPhase.illumination01,
                 moonIsWaxing = moonPhase.isWaxing,
+                moonLitDirectionRadians = moonLitDirectionRadians,
                 skyBodySize = resolvedSettings.skyBodySize,
                 now = now,
                 error = if (coordinate == null) "Location unavailable" else null

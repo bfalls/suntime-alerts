@@ -6,6 +6,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.math.acos
 import kotlin.math.asin
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -101,6 +102,29 @@ class SunTimesCalculator {
     }
 
     companion object {
+        fun sunAltAz(time: ZonedDateTime, latitudeDeg: Double, longitudeDeg: Double): AltAz {
+            val sunLon = sunApparentEclipticLongitude(time)
+            val (rightAscension, declination) = sunEquatorialCoordinates(sunLon, time)
+            val localSiderealTime = localSiderealTime(time, longitudeDeg)
+            val hourAngle = Math.toRadians(normalizeAngleDeg(localSiderealTime - rightAscension))
+            val latitude = Math.toRadians(latitudeDeg)
+            val declinationRad = Math.toRadians(declination)
+
+            val altitude = asin(
+                sin(declinationRad) * sin(latitude) +
+                    cos(declinationRad) * cos(latitude) * cos(hourAngle)
+            )
+            val azimuth = atan2(
+                -sin(hourAngle),
+                tan(declinationRad) * cos(latitude) - sin(latitude) * cos(hourAngle)
+            )
+
+            return AltAz(
+                altitudeDeg = Math.toDegrees(altitude),
+                azimuthDeg = normalizeAngleDeg(Math.toDegrees(azimuth))
+            )
+        }
+
         fun sunApparentEclipticLongitude(time: ZonedDateTime): Double {
             val jd = julianDay(time)
             val jc = (jd - 2451545.0) / 36525.0
@@ -114,6 +138,25 @@ class SunTimesCalculator {
             val omega = 125.04 - 1934.136 * jc
             val sunAppLong = sunTrueLong - 0.00569 - 0.00478 * sin(Math.toRadians(omega))
             return normalizeAngleDeg(sunAppLong)
+        }
+
+        private fun sunEquatorialCoordinates(lonDeg: Double, time: ZonedDateTime): Pair<Double, Double> {
+            val lon = Math.toRadians(lonDeg)
+            val d = julianDay(time) - 2451545.0
+            val obliquity = Math.toRadians(23.439291 - 0.00000036 * d)
+            val declination = asin(sin(obliquity) * sin(lon))
+            val rightAscension = atan2(sin(lon) * cos(obliquity), cos(lon))
+            return normalizeAngleDeg(Math.toDegrees(rightAscension)) to Math.toDegrees(declination)
+        }
+
+        private fun localSiderealTime(time: ZonedDateTime, longitudeDeg: Double): Double {
+            val jd = julianDay(time)
+            val t = (jd - 2451545.0) / 36525.0
+            val theta = 280.46061837 +
+                360.98564736629 * (jd - 2451545.0) +
+                0.000387933 * t * t -
+                t * t * t / 38710000.0
+            return normalizeAngleDeg(theta + longitudeDeg)
         }
 
         private fun julianDay(dateTime: ZonedDateTime): Double {
