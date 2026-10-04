@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Explore
@@ -59,7 +60,7 @@ fun SkyInfoOverlay(
     metrics: SkyInfoMetrics,
     modifier: Modifier = Modifier,
     showIconCircle: Boolean = true,
-    // Connect navigation here when the advanced-information screen is added.
+    // Home supplies the dashboard action; standalone previews can stay informational.
     onOpenAdvancedInfo: ((SkyInfoMetrics) -> Unit)? = null
 ) {
     val messages = remember(metrics) { SkyInfoMessages.forMetrics(metrics) }
@@ -123,6 +124,10 @@ fun SkyInfoOverlay(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
+                if (onOpenAdvancedInfo != null) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                }
             }
         }
     }

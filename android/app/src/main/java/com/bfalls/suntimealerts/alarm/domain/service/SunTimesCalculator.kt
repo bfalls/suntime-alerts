@@ -102,6 +102,12 @@ class SunTimesCalculator {
     }
 
     companion object {
+        /** Signed local hour angle: zero at upper transit, +/-180 at lower transit. */
+        fun sunHourAngleDeg(time: ZonedDateTime, longitudeDeg: Double): Double {
+            val (rightAscension, _) = sunEquatorialCoordinates(sunApparentEclipticLongitude(time), time)
+            return normalizeAngleDeg(localSiderealTime(time, longitudeDeg) - rightAscension + 180.0) - 180.0
+        }
+
         fun sunAltAz(time: ZonedDateTime, latitudeDeg: Double, longitudeDeg: Double): AltAz {
             val sunLon = sunApparentEclipticLongitude(time)
             val (rightAscension, declination) = sunEquatorialCoordinates(sunLon, time)

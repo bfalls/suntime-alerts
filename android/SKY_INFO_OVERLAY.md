@@ -43,12 +43,55 @@ or windows starting within two hours are displayed. Darkness duration is
 astronomical dusk to the following astronomical dawn. Solar rise/set times
 reuse the existing calculator so the banner and alarm times agree.
 
-## Future details navigation
+## Advanced dashboard
 
-`HomeScreen`, `HomeScreenContent`, and `SkyInfoOverlay` accept an optional
-`onOpenAdvancedInfo: (SkyInfoMetrics) -> Unit` callback. Once connected, the
-entire row is a tap target and passes the current full snapshot. Until then,
-the row is informational and exposes no inactive action.
+Home opens `SkyDashboardDialog` when the banner information row is tapped.
+A small chevron and the normal tap ripple indicate that more information is
+available. The banner and terrain retain their original dimensions.
+
+The floating panel is limited to 85% of available screen height. Its header
+and Close button remain fixed while the dashboard scrolls. Tapping outside,
+Close, or Android Back dismisses it; tapping inside does not. Expanded groups
+and the selected timeline period survive ordinary metric updates. Expanding
+a group smoothly scrolls its bottom to the bottom of the viewport, with a
+small inset. Clock updates do not repeat that scroll.
+
+- Today's light: daily duration/change, sunrise/sunset, live event countdown,
+  and a tappable 24-hour light timeline with civil, nautical, astronomical,
+  daylight, and darkness segments.
+- Sun/Moon tiles: current elevation and compass bearing; the Moon uses the
+  shared upright phase orientation calculation.
+- Photography: morning/evening golden and blue windows, durations, and the
+  current or next opportunity.
+- Twilight: all six boundaries, each complete twilight interval's duration,
+  sunset-to-sunrise night, and astronomical darkness as separate quantities.
+- Moon: current phase/illumination and the current or next above-horizon
+  passage's rise/set times, bearings, and peak altitude.
+- Where to look right now: north-up Sun/Moon compass, solar noon/midnight,
+  altitude at noon, and sunrise/sunset bearings.
+
+The dashboard follows the app's light/dark theme and the phone's system
+12/24-hour time format, matching the sunrise/sunset headers.
+The shared Compose state observes `Settings.System.TIME_12_24` and refreshes
+on resume, so changing the phone setting updates the headers and an open
+dashboard without waiting for a clock tick or restarting the app. The
+observer is unregistered when the screen leaves composition.
+Events outside today's date include a date; unavailable events have explicit
+labels. Coordinates and the snapshot's timezone appear in the header.
+
+`SkyInfoCalculator` caches the added daily timeline, twilight intervals,
+and solar transits. Solar noon/midnight find zero/180-degree hour-angle
+crossings from the existing ephemeris, rather than assuming clock noon or
+the midpoint between rise and set. See the
+[USNO transit definition](https://aa.usno.navy.mil/faq/RST_defs).
+Timeline widths use elapsed time, including 23/25-hour DST days.
+
+The dashboard is Android-only. The desktop lab continues to share the
+astronomy and banner messages without a dashboard UI. Lunar age, upcoming
+phase forecasts, and annual/seasonal charts are reserved for the next stage.
+
+The optional `onOpenAdvancedInfo: (SkyInfoMetrics) -> Unit` callback remains
+available for callers that want to replace Home's default dashboard action.
 
 ## Verification
 
@@ -58,3 +101,9 @@ countdowns, relevant message counts, expired windows, and missing events.
 `SkyInfoOverlayTest` checks rotation, live text updates, the navigation hook,
 and unchanged banner height; it saves banner PNGs for the four periods in
 the test app's external files directory.
+
+`SkyDashboardDialogTest` checks opening from Home, all dismissal paths,
+inside taps, live updates with expanded groups, large text, and light/dark
+and polar rendering. It saves dashboard PNGs alongside the banner previews.
+Unit tests cover transit, full-day/DST timeline coverage, both photographic
+passes, adjoining nights, polar omissions, and dated 12/24-hour formatting.

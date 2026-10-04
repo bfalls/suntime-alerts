@@ -10,17 +10,31 @@ enum class SkyInfoPeriod { DAWN, DAYLIGHT, EVENING_TWILIGHT, NIGHT }
 
 data class SolarCrossing(val time: ZonedDateTime, val altitudeDeg: Double, val rising: Boolean)
 
+data class SolarTransit(val time: ZonedDateTime, val altitudeDeg: Double)
+
+enum class SkyLightPeriod { DAYLIGHT, CIVIL_TWILIGHT, NAUTICAL_TWILIGHT, ASTRONOMICAL_TWILIGHT, DARKNESS }
+
+data class SkyLightSegment(val start: ZonedDateTime, val end: ZonedDateTime, val period: SkyLightPeriod)
+
+data class TwilightWindow(val period: SkyLightPeriod, val start: ZonedDateTime, val end: ZonedDateTime, val isMorning: Boolean)
+
 data class SolarDayInfo(
     val date: LocalDate,
     val sunrise: ZonedDateTime?,
     val sunset: ZonedDateTime?,
     val crossings: List<SolarCrossing>,
-    val daylight: Duration?
+    val daylight: Duration?,
+    val solarNoon: SolarTransit? = null,
+    val solarMidnight: SolarTransit? = null,
+    val sunriseAzimuthDeg: Double? = null,
+    val sunsetAzimuthDeg: Double? = null,
+    val lightSegments: List<SkyLightSegment> = emptyList(),
+    val twilightWindows: List<TwilightWindow> = emptyList()
 )
 
 enum class PhotoLight { GOLDEN, BLUE }
 
-data class PhotoLightWindow(val light: PhotoLight, val start: ZonedDateTime, val end: ZonedDateTime)
+data class PhotoLightWindow(val light: PhotoLight, val start: ZonedDateTime, val end: ZonedDateTime, val isMorning: Boolean = true)
 
 /** Full snapshot for the banner and a future advanced-information screen. */
 data class SkyInfoMetrics(
@@ -39,7 +53,12 @@ data class SkyInfoMetrics(
     val sunPosition: AltAz,
     val moonPhase: MoonPhase,
     val moonPosition: AltAz,
-    val moonWindow: MoonArcWindow
+    val moonWindow: MoonArcWindow,
+    val photoWindows: List<PhotoLightWindow> = emptyList(),
+    val nextPhotoWindow: PhotoLightWindow? = null,
+    val sunsetToSunrise: Duration? = null,
+    val moonRiseAzimuthDeg: Double? = null,
+    val moonSetAzimuthDeg: Double? = null
 )
 
 /**
@@ -90,6 +109,9 @@ class SkyInfoCalculator(private val sunTimesCalculator: SunTimesCalculator = Sun
         val dusk = duskDay.crossings.firstOrNull { !it.rising && it.altitudeDeg == -18.0 }?.time
         val dawn = dawnDay.crossings.firstOrNull { it.rising && it.altitudeDeg == -18.0 }?.time
         val darkness = if (dusk != null && dawn != null && dawn.isAfter(dusk)) Duration.between(dusk, dawn) else null
+        val night = duskDay.sunset?.let { sunset ->
+            dawnDay.sunrise?.takeIf { it.isAfter(sunset) }?.let { Duration.between(sunset, it) }
+        }
 
         val moonPosition = MoonEphemeris.moonAltAz(now, coordinate.latitude, coordinate.longitude)
         val oldWindow = cachedMoonWindow
@@ -122,7 +144,14 @@ class SkyInfoCalculator(private val sunTimesCalculator: SunTimesCalculator = Sun
             sunPosition = sunPosition,
             moonPhase = MoonEphemeris.moonPhase(now),
             moonPosition = moonPosition,
-            moonWindow = requireNotNull(cachedMoonWindow)
+            moonWindow = requireNotNull(cachedMoonWindow),
+            photoWindows = windows.filter {
+                it.end.isAfter(today.date.atStartOfDay(now.zone)) && it.start.isBefore(today.date.plusDays(1).atStartOfDay(now.zone))
+            },
+            nextPhotoWindow = windows.firstOrNull { it.end.isAfter(now) },
+            sunsetToSunrise = night,
+            moonRiseAzimuthDeg = cachedMoonWindow?.rise?.let { MoonEphemeris.moonAltAz(it, coordinate.latitude, coordinate.longitude).azimuthDeg },
+            moonSetAzimuthDeg = cachedMoonWindow?.set?.let { MoonEphemeris.moonAltAz(it, coordinate.latitude, coordinate.longitude).azimuthDeg }
         )
     }
 
@@ -133,9 +162,19 @@ class SkyInfoCalculator(private val sunTimesCalculator: SunTimesCalculator = Sun
         var previousTime = date.atStartOfDay(zone)
         val end = date.plusDays(1).atStartOfDay(zone)
         var previousAlt = SunTimesCalculator.sunAltAz(previousTime, coordinate.latitude, coordinate.longitude).altitudeDeg
+        var previousHourAngle = SunTimesCalculator.sunHourAngleDeg(previousTime, coordinate.longitude)
+        var solarNoon: SolarTransit? = null
+        var solarMidnight: SolarTransit? = null
         while (previousTime.isBefore(end)) {
             val time = minOf(previousTime.plusMinutes(5), end)
             val altitude = SunTimesCalculator.sunAltAz(time, coordinate.latitude, coordinate.longitude).altitudeDeg
+            val hourAngle = SunTimesCalculator.sunHourAngleDeg(time, coordinate.longitude)
+            if (previousHourAngle <= 0.0 && hourAngle > 0.0 && hourAngle - previousHourAngle < 180.0 && solarNoon == null) {
+                solarNoon = findTransit(previousTime, time, coordinate, 0.0).takeIf { it.time.isBefore(end) }
+            }
+            if (previousHourAngle > 0.0 && hourAngle < 0.0 && previousHourAngle - hourAngle > 180.0 && solarMidnight == null) {
+                solarMidnight = findTransit(previousTime, time, coordinate, 180.0).takeIf { it.time.isBefore(end) }
+            }
             for (threshold in thresholds) {
                 val rising = previousAlt < threshold && altitude >= threshold
                 val setting = previousAlt >= threshold && altitude < threshold
@@ -145,11 +184,58 @@ class SkyInfoCalculator(private val sunTimesCalculator: SunTimesCalculator = Sun
             }
             previousTime = time
             previousAlt = altitude
+            previousHourAngle = hourAngle
         }
         val daylight = if (sunTimes.sunrise != null && sunTimes.sunset != null && sunTimes.sunset.isAfter(sunTimes.sunrise)) {
             Duration.between(sunTimes.sunrise, sunTimes.sunset)
         } else null
-        return SolarDayInfo(date, sunTimes.sunrise, sunTimes.sunset, crossings.sortedBy { it.time.toInstant() }, daylight)
+        val orderedCrossings = crossings.sortedBy { it.time.toInstant() }
+        val boundaries = (listOf(date.atStartOfDay(zone), end) + orderedCrossings.filter { it.altitudeDeg in listOf(-18.0, -12.0, -6.0) }.map { it.time } +
+            listOfNotNull(sunTimes.sunrise, sunTimes.sunset)).distinct().sortedBy { it.toInstant() }
+        val segments = boundaries.zipWithNext { start, finish ->
+            val midpoint = start.plusNanos(Duration.between(start, finish).toNanos() / 2)
+            val altitude = SunTimesCalculator.sunAltAz(midpoint, coordinate.latitude, coordinate.longitude).altitudeDeg
+            val isDaylight = if (sunTimes.sunrise != null && sunTimes.sunset != null) {
+                !midpoint.isBefore(sunTimes.sunrise) && midpoint.isBefore(sunTimes.sunset)
+            } else altitude >= -0.833
+            SkyLightSegment(start, finish, when {
+                isDaylight -> SkyLightPeriod.DAYLIGHT
+                altitude >= -6.0 -> SkyLightPeriod.CIVIL_TWILIGHT
+                altitude >= -12.0 -> SkyLightPeriod.NAUTICAL_TWILIGHT
+                altitude >= -18.0 -> SkyLightPeriod.ASTRONOMICAL_TWILIGHT
+                else -> SkyLightPeriod.DARKNESS
+            })
+        }
+        val twilightWindows = buildList {
+            for (morning in listOf(true, false)) {
+                fun boundary(altitude: Double) = orderedCrossings.firstOrNull { it.rising == morning && it.altitudeDeg == altitude }?.time
+                val edges = if (morning) listOf(boundary(-18.0), boundary(-12.0), boundary(-6.0), sunTimes.sunrise)
+                else listOf(sunTimes.sunset, boundary(-6.0), boundary(-12.0), boundary(-18.0))
+                val periods = if (morning) listOf(SkyLightPeriod.ASTRONOMICAL_TWILIGHT, SkyLightPeriod.NAUTICAL_TWILIGHT, SkyLightPeriod.CIVIL_TWILIGHT)
+                else listOf(SkyLightPeriod.CIVIL_TWILIGHT, SkyLightPeriod.NAUTICAL_TWILIGHT, SkyLightPeriod.ASTRONOMICAL_TWILIGHT)
+                edges.zipWithNext().forEachIndexed { index, (start, finish) ->
+                    if (start != null && finish != null && finish.isAfter(start)) add(TwilightWindow(periods[index], start, finish, morning))
+                }
+            }
+        }
+        return SolarDayInfo(date, sunTimes.sunrise, sunTimes.sunset, orderedCrossings, daylight,
+            solarNoon, solarMidnight,
+            sunTimes.sunrise?.let { SunTimesCalculator.sunAltAz(it, coordinate.latitude, coordinate.longitude).azimuthDeg },
+            sunTimes.sunset?.let { SunTimesCalculator.sunAltAz(it, coordinate.latitude, coordinate.longitude).azimuthDeg },
+            segments, twilightWindows)
+    }
+
+    private fun findTransit(start: ZonedDateTime, end: ZonedDateTime, coordinate: Coordinate, target: Double): SolarTransit {
+        var low = start
+        var high = end
+        while (Duration.between(low, high).toMillis() > 1000) {
+            val midpoint = low.plusNanos(Duration.between(low, high).toNanos() / 2)
+            val hourAngle = SunTimesCalculator.sunHourAngleDeg(midpoint, coordinate.longitude)
+            val relative = ((hourAngle - target + 540.0) % 360.0) - 180.0
+            if (relative >= 0.0) high = midpoint else low = midpoint
+        }
+        val time = high.withNano(0)
+        return SolarTransit(time, SunTimesCalculator.sunAltAz(time, coordinate.latitude, coordinate.longitude).altitudeDeg)
     }
 
     private fun findCrossing(start: ZonedDateTime, end: ZonedDateTime, coordinate: Coordinate, threshold: Double, rising: Boolean): ZonedDateTime {
@@ -183,7 +269,7 @@ class SkyInfoCalculator(private val sunTimesCalculator: SunTimesCalculator = Sun
             // pass. Do not manufacture a multi-day window at high latitudes.
             val end = crossings.firstOrNull { it.time.isAfter(start.time) && it.rising == start.rising && it.altitudeDeg == endAltitude }
             if (end != null && Duration.between(start.time, end.time) < Duration.ofHours(12)) {
-                windows += PhotoLightWindow(light, start.time, end.time)
+                windows += PhotoLightWindow(light, start.time, end.time, start.rising)
             }
         }
         return windows.sortedBy { it.start.toInstant() }

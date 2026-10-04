@@ -1,6 +1,7 @@
 package com.bfalls.suntimealerts.alarm.presentation.ui
 
 import com.bfalls.suntimealerts.alarm.domain.service.PhotoLight
+import com.bfalls.suntimealerts.alarm.domain.service.MoonPhase
 import com.bfalls.suntimealerts.alarm.domain.service.SkyInfoMetrics
 import com.bfalls.suntimealerts.alarm.domain.service.SkyInfoPeriod
 import java.time.Duration
@@ -58,13 +59,7 @@ object SkyInfoMessages {
         val position = message(SkyInfoCategory.SUN_POSITION,
             if (sunPosition.altitudeDeg >= 0) "Sun ${sunPosition.altitudeDeg.roundToInt()}° high · ${compass(sunPosition.azimuthDeg)}"
             else "Sun ${abs(sunPosition.altitudeDeg).roundToInt()}° below horizon")
-        val phaseName = when {
-            moonPhase.illumination01 <= 0.01 -> "New Moon"
-            moonPhase.illumination01 >= 0.99 -> "Full Moon"
-            moonPhase.illumination01 in 0.47..0.53 -> if (moonPhase.isWaxing) "First quarter" else "Last quarter"
-            moonPhase.illumination01 < 0.5 -> if (moonPhase.isWaxing) "Waxing crescent" else "Waning crescent"
-            else -> if (moonPhase.isWaxing) "Waxing gibbous" else "Waning gibbous"
-        }
+        val phaseName = phaseName(moonPhase)
         val moon = message(SkyInfoCategory.MOON_PHASE, "$phaseName · ${(moonPhase.illumination01 * 100).roundToInt()}% lit")
         val moonEvent = if (moonPosition.altitudeDeg >= 0) {
             moonWindow.set?.takeIf { it.isAfter(now) }?.let { message(SkyInfoCategory.MOON_EVENT, "Moonset ${until(now, it)}") }
@@ -110,7 +105,15 @@ object SkyInfoMessages {
         else -> "Astronomical"
     }
 
-    private fun compass(azimuth: Double): String {
+    fun phaseName(phase: MoonPhase): String = when {
+        phase.illumination01 <= 0.01 -> "New Moon"
+        phase.illumination01 >= 0.99 -> "Full Moon"
+        phase.illumination01 in 0.47..0.53 -> if (phase.isWaxing) "First quarter" else "Last quarter"
+        phase.illumination01 < 0.5 -> if (phase.isWaxing) "Waxing crescent" else "Waning crescent"
+        else -> if (phase.isWaxing) "Waxing gibbous" else "Waning gibbous"
+    }
+
+    fun compass(azimuth: Double): String {
         val names = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
         return names[((azimuth + 22.5) / 45.0).toInt() % 8]
     }

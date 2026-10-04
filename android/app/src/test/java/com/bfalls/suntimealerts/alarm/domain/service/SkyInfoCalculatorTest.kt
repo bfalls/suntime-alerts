@@ -15,6 +15,79 @@ class SkyInfoCalculatorTest {
     private val date = LocalDate.of(2026, 10, 4)
 
     @Test
+    fun `dashboard exposes both photography passes even outside the banner window`() {
+        val metrics = SkyInfoCalculator().calculate(date.atTime(12, 0).atZone(zone), coordinate)
+        assertNull(metrics.photoWindow)
+        assertEquals(4, metrics.photoWindows.size)
+        assertEquals(setOf(true, false), metrics.photoWindows.map { it.isMorning }.toSet())
+        assertEquals(2, metrics.photoWindows.count { it.light == PhotoLight.GOLDEN })
+        assertTrue(metrics.photoWindows.all { it.end.isAfter(it.start) })
+        assertTrue(metrics.nextPhotoWindow!!.start.isAfter(metrics.now.plusHours(2)))
+        val after = SkyInfoCalculator().calculate(date.atTime(23, 0).atZone(zone), coordinate)
+        assertEquals(4, after.photoWindows.size)
+        assertEquals(date.plusDays(1), after.nextPhotoWindow!!.start.toLocalDate())
+    }
+
+    @Test
+    fun `light timeline covers entire local day including DST and preserves alarm boundaries`() {
+        val calculator = SkyInfoCalculator()
+        listOf(date, LocalDate.of(2026, 3, 8), LocalDate.of(2026, 11, 1)).forEach { viewingDate ->
+            val day = calculator.calculate(viewingDate.atTime(12, 0).atZone(zone), coordinate).today
+            val start = viewingDate.atStartOfDay(zone)
+            val end = viewingDate.plusDays(1).atStartOfDay(zone)
+            assertEquals(start, day.lightSegments.first().start)
+            assertEquals(end, day.lightSegments.last().end)
+            assertEquals(Duration.between(start, end).toMillis(), day.lightSegments.sumOf { Duration.between(it.start, it.end).toMillis() })
+            day.lightSegments.zipWithNext().forEach { (previous, next) -> assertEquals(previous.end, next.start) }
+            assertTrue(day.lightSegments.all { it.end.isAfter(it.start) })
+            val daylight = day.lightSegments.single { it.period == SkyLightPeriod.DAYLIGHT }
+            assertEquals(day.sunrise, daylight.start)
+            assertEquals(day.sunset, daylight.end)
+            assertEquals(6, day.twilightWindows.size)
+        }
+    }
+
+    @Test
+    fun `solar transit uses meridian crossing instead of clock noon or sunrise midpoint`() {
+        val day = SkyInfoCalculator().calculate(date.atTime(12, 0).atZone(zone), coordinate).today
+        val noon = day.solarNoon!!
+        val midnight = day.solarMidnight!!
+        assertEquals(13, noon.time.hour)
+        assertEquals(0.0, SunTimesCalculator.sunHourAngleDeg(noon.time, coordinate.longitude), 0.01)
+        assertEquals(180.0, abs(SunTimesCalculator.sunHourAngleDeg(midnight.time, coordinate.longitude)), 0.01)
+        val before = SunTimesCalculator.sunAltAz(noon.time.minusMinutes(10), coordinate.latitude, coordinate.longitude)
+        val after = SunTimesCalculator.sunAltAz(noon.time.plusMinutes(10), coordinate.latitude, coordinate.longitude)
+        assertTrue(noon.altitudeDeg > before.altitudeDeg && noon.altitudeDeg > after.altitudeDeg)
+        assertTrue(day.sunriseAzimuthDeg!! in 0.0..180.0)
+        assertTrue(day.sunsetAzimuthDeg!! in 180.0..360.0)
+    }
+
+    @Test
+    fun `polar dashboard retains transit and all day light without invented windows`() {
+        val calculator = SkyInfoCalculator()
+        val summer = calculator.calculate(ZonedDateTime.parse("2026-06-21T12:00:00Z"), Coordinate(85.0, 0.0))
+        assertNotNull(summer.today.solarNoon)
+        assertNotNull(summer.today.solarMidnight)
+        assertNull(summer.today.sunriseAzimuthDeg)
+        assertNull(summer.today.sunsetAzimuthDeg)
+        assertEquals(listOf(SkyLightPeriod.DAYLIGHT), summer.today.lightSegments.map { it.period })
+        assertTrue(summer.photoWindows.isEmpty())
+        assertTrue(summer.today.twilightWindows.isEmpty())
+        val winter = calculator.calculate(ZonedDateTime.parse("2026-12-21T12:00:00Z"), Coordinate(85.0, 0.0))
+        assertEquals(listOf(SkyLightPeriod.DARKNESS), winter.today.lightSegments.map { it.period })
+        assertNull(winter.sunsetToSunrise)
+    }
+
+    @Test
+    fun `sunset to sunrise night and astronomical darkness remain distinct`() {
+        val calculator = SkyInfoCalculator()
+        val evening = calculator.calculate(date.atTime(23, 0).atZone(zone), coordinate)
+        val morning = calculator.calculate(date.plusDays(1).atTime(1, 0).atZone(zone), coordinate)
+        assertEquals(evening.sunsetToSunrise, morning.sunsetToSunrise)
+        assertTrue(evening.sunsetToSunrise!! > evening.astronomicalDarkness!!)
+    }
+
+    @Test
     fun `four periods follow solar events rather than fixed clock hours`() {
         val calculator = SkyInfoCalculator()
         val day = calculator.calculate(date.atTime(12, 0).atZone(zone), coordinate).today

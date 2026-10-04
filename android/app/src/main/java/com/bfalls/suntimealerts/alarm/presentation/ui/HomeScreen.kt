@@ -114,7 +114,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import android.text.format.DateFormat
 import com.bfalls.suntimealerts.R
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
@@ -226,11 +225,13 @@ fun HomeScreenContent(
     onOpenAdvancedInfo: ((SkyInfoMetrics) -> Unit)? = null
 ) {
     val scope = rememberCoroutineScope()
+    val use24h = rememberSystem24HourFormat()
     val snackbarHostState = remember { SnackbarHostState() }
     var editingAlarm by remember { mutableStateOf<SunAlarm?>(null) }
     var sheetType by remember { mutableStateOf(SunEventType.SUNRISE) }
     var showSheet by remember { mutableStateOf(false) }
     var showFeedbackDialog by rememberSaveable { mutableStateOf(false) }
+    var showSkyDashboard by rememberSaveable { mutableStateOf(false) }
 
     val openSheet: (SunAlarm?, SunEventType) -> Unit = { alarm, type ->
         editingAlarm = alarm
@@ -280,7 +281,10 @@ fun HomeScreenContent(
                     skyBodySize = state.skyBodySize,
                     onOpenSettings = onOpenSettings,
                     skyInfoMetrics = state.skyInfoMetrics,
-                    onOpenAdvancedInfo = onOpenAdvancedInfo
+                    onOpenAdvancedInfo = { metrics ->
+                        if (onOpenAdvancedInfo != null) onOpenAdvancedInfo(metrics)
+                        else showSkyDashboard = true
+                    }
                 )
             }
         },
@@ -322,7 +326,7 @@ fun HomeScreenContent(
                         )
                     }
                     stickyHeader {
-                        AlarmSectionHeader(title = "Sunrise", time = state.sunriseTime)
+                        AlarmSectionHeader(title = "Sunrise", time = state.sunriseTime, use24h = use24h)
                     }
                     items(state.sunriseAlarms, key = { it.id }) { alarm ->
                         AlarmRow(
@@ -349,7 +353,7 @@ fun HomeScreenContent(
                     }
                     item { Spacer(modifier = Modifier.height(16.dp)) }
                     stickyHeader {
-                        AlarmSectionHeader(title = "Sunset", time = state.sunsetTime)
+                        AlarmSectionHeader(title = "Sunset", time = state.sunsetTime, use24h = use24h)
                     }
                     items(state.sunsetAlarms, key = { it.id }) { alarm ->
                         AlarmRow(
@@ -381,6 +385,16 @@ fun HomeScreenContent(
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
             }
+        }
+    }
+
+    if (showSkyDashboard) {
+        state.skyInfoMetrics?.let { metrics ->
+            SkyDashboardDialog(
+                metrics = metrics,
+                use24h = use24h,
+                onDismiss = { showSkyDashboard = false }
+            )
         }
     }
 
@@ -507,12 +521,11 @@ private fun AlarmReadinessBanner(
 private fun AlarmSectionHeader(
     title: String,
     time: ZonedDateTime?,
+    use24h: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val timeText = time?.let {
-        val is24Hour = DateFormat.is24HourFormat(context)
-        val pattern = if (is24Hour) "HH:mm" else "h:mm a"
+        val pattern = if (use24h) "HH:mm" else "h:mm a"
         val formatter = DateTimeFormatter.ofPattern(pattern)
         it.format(formatter)
     }
@@ -1663,12 +1676,13 @@ private fun AlarmLists(
     snackbarHostState: SnackbarHostState,
     scope: CoroutineScope
 ) {
+    val use24h = rememberSystem24HourFormat()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         stickyHeader {
-            AlarmSectionHeader(title = "Sunrise", time = state.sunriseTime)
+            AlarmSectionHeader(title = "Sunrise", time = state.sunriseTime, use24h = use24h)
         }
         items(state.sunriseAlarms, key = { it.id }) { alarm ->
             AlarmRow(
@@ -1695,7 +1709,7 @@ private fun AlarmLists(
         }
         item { Spacer(modifier = Modifier.height(16.dp)) }
         stickyHeader {
-            AlarmSectionHeader(title = "Sunset", time = state.sunsetTime)
+            AlarmSectionHeader(title = "Sunset", time = state.sunsetTime, use24h = use24h)
         }
         items(state.sunsetAlarms, key = { it.id }) { alarm ->
             AlarmRow(

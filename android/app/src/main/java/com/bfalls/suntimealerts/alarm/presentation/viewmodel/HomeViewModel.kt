@@ -65,6 +65,7 @@ class HomeViewModel(
         val now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault()),
         val skyInfoMetrics: SkyInfoMetrics? = null,
         val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
+        val timeFormat24h: Boolean = true,
         val alarmReadiness: AlarmReadiness? = null,
         val error: String? = null
     )
@@ -194,7 +195,8 @@ class HomeViewModel(
                     sunsetTime = placeholderSunTimes.sunset,
                     sunriseTimeText = formatTime(placeholderSunTimes.sunrise, settings.timeFormat24h),
                     sunsetTimeText = formatTime(placeholderSunTimes.sunset, settings.timeFormat24h),
-                    skyBodySize = settings.skyBodySize
+                    skyBodySize = settings.skyBodySize,
+                    timeFormat24h = settings.timeFormat24h
                 )
             }
 
@@ -281,6 +283,7 @@ class HomeViewModel(
                 moonIsWaxing = moonPhase.isWaxing,
                 moonLitDirectionRadians = moonLitDirectionRadians,
                 skyBodySize = resolvedSettings.skyBodySize,
+                timeFormat24h = resolvedSettings.timeFormat24h,
                 now = now,
                 skyInfoMetrics = metrics,
                 error = if (coordinate == null) "Location unavailable" else null
