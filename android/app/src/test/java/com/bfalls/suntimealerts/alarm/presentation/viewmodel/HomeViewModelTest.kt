@@ -22,6 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -227,6 +228,37 @@ class HomeViewModelTest {
 
         assertFalse(viewModel.state.value.alarmReadiness?.canDeliverReliableAlerts ?: true)
         assertEquals(true, settingsRepo.load().onboardingComplete)
+    }
+
+    @Test
+    fun clockTicksUpdateMetricsAndRollOverTheDateWithoutRequestingLocationOrScheduling() = runTest {
+        val coordinate = Coordinate(43.615, -116.2023)
+        val settings = UserSettings(
+            locationMode = LocationMode.FIXED,
+            fixedLocation = coordinate,
+            sunriseConfig = SunAlarmConfig(false, SunEventType.SUNRISE, 0),
+            sunsetConfig = SunAlarmConfig(false, SunEventType.SUNSET, 0),
+            timeFormat24h = true,
+            onboardingComplete = true
+        )
+        val location = RecordingLocationProvider()
+        val scheduler = RecordingScheduler()
+        val viewModel = HomeViewModel(
+            location, FakeSettingsRepository(settings, emptyList()), scheduler,
+            SunTimesCalculator(), FakeAlarmReadinessProvider()
+        )
+        advanceUntilIdle()
+        val scheduledCount = scheduler.receivedCoordinates.size
+        val now = ZonedDateTime.parse("2026-10-04T23:59:00-06:00[America/Boise]")
+        viewModel.updateClock(now)
+        viewModel.updateClock(now.plusMinutes(1))
+        val state = viewModel.state.value
+        assertEquals(now.plusMinutes(1), state.now)
+        assertEquals(now.toLocalDate().plusDays(1), state.skyInfoMetrics!!.today.date)
+        assertEquals(state.skyInfoMetrics.today.sunrise, state.sunriseTime)
+        assertEquals(state.skyInfoMetrics.today.sunset, state.sunsetTime)
+        assertEquals(0, location.requestCount)
+        assertEquals(scheduledCount, scheduler.receivedCoordinates.size)
     }
 
     private class FakeSettingsRepository(

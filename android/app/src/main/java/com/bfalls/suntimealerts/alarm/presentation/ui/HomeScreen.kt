@@ -129,6 +129,7 @@ import com.bfalls.suntimealerts.alarm.domain.service.MoonArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.MoonPhaseMask
 import com.bfalls.suntimealerts.alarm.domain.service.MoonXY
 import com.bfalls.suntimealerts.alarm.domain.service.SkyBackgroundModel
+import com.bfalls.suntimealerts.alarm.domain.service.SkyInfoMetrics
 import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunXY
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
@@ -168,7 +169,8 @@ fun HomeScreen(
     onOpenNotificationSettings: () -> Unit,
     onOpenNotificationChannelSettings: (String?) -> Unit,
     onOpenExactAlarmSettings: () -> Unit,
-    onOpenFullScreenIntentSettings: () -> Unit
+    onOpenFullScreenIntentSettings: () -> Unit,
+    onOpenAdvancedInfo: ((SkyInfoMetrics) -> Unit)? = null
 ) {
     val state by viewModel.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -176,6 +178,12 @@ fun HomeScreen(
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.refresh()
+            launch {
+                while (true) {
+                    delay(60_000L - System.currentTimeMillis() % 60_000L)
+                    viewModel.updateClock()
+                }
+            }
             while (true) {
                 delay(15 * 60 * 1000L)
                 viewModel.refreshSunMoonPositions()
@@ -195,7 +203,8 @@ fun HomeScreen(
         onOpenNotificationSettings = onOpenNotificationSettings,
         onOpenNotificationChannelSettings = onOpenNotificationChannelSettings,
         onOpenExactAlarmSettings = onOpenExactAlarmSettings,
-        onOpenFullScreenIntentSettings = onOpenFullScreenIntentSettings
+        onOpenFullScreenIntentSettings = onOpenFullScreenIntentSettings,
+        onOpenAdvancedInfo = onOpenAdvancedInfo
     )
 }
 
@@ -213,7 +222,8 @@ fun HomeScreenContent(
     onOpenNotificationSettings: () -> Unit,
     onOpenNotificationChannelSettings: (String?) -> Unit,
     onOpenExactAlarmSettings: () -> Unit,
-    onOpenFullScreenIntentSettings: () -> Unit
+    onOpenFullScreenIntentSettings: () -> Unit,
+    onOpenAdvancedInfo: ((SkyInfoMetrics) -> Unit)? = null
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -228,7 +238,7 @@ fun HomeScreenContent(
         showSheet = true
     }
     val hasSunTimes = state.sunriseTime != null && state.sunsetTime != null
-    val readyToRender = !state.isLoading && hasSunTimes
+    val readyToRender = !state.isLoading && (hasSunTimes || state.coordinateUsed != null)
     val typeLabel: (SunAlarm) -> String = { alarm -> if (alarm.type == SunEventType.SUNRISE) "Sunrise" else "Sunset" }
     val handleDelete: (SunAlarm) -> Unit = { alarm ->
         val deleteIndex = (state.sunriseAlarms + state.sunsetAlarms).indexOfFirst { it.id == alarm.id }
@@ -268,7 +278,9 @@ fun HomeScreenContent(
                     sunTimesResolved = readyToRender,
                     now = state.now,
                     skyBodySize = state.skyBodySize,
-                    onOpenSettings = onOpenSettings
+                    onOpenSettings = onOpenSettings,
+                    skyInfoMetrics = state.skyInfoMetrics,
+                    onOpenAdvancedInfo = onOpenAdvancedInfo
                 )
             }
         },
@@ -1144,12 +1156,15 @@ private fun SkyTopBar(
     sunTimesResolved: Boolean,
     now: ZonedDateTime,
     skyBodySize: SkyBodySize,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    skyInfoMetrics: SkyInfoMetrics?,
+    onOpenAdvancedInfo: ((SkyInfoMetrics) -> Unit)?
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(200.dp)
+            .testTag("sky_top_bar")
     ) {
         SkyAppBarBackground(
             sunrise = sunrise,
@@ -1164,6 +1179,7 @@ private fun SkyTopBar(
             sunTimesResolved = sunTimesResolved,
             now = now,
             skyBodySize = skyBodySize,
+            sunAltitudeDeg = skyInfoMetrics?.sunPosition?.altitudeDeg,
             modifier = Modifier
                 .matchParentSize()
                 .testTag("sky_appbar_background")
@@ -1182,6 +1198,13 @@ private fun SkyTopBar(
                 }
             }
         )
+        skyInfoMetrics?.let { metrics ->
+            SkyInfoOverlay(
+                metrics = metrics,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                onOpenAdvancedInfo = onOpenAdvancedInfo
+            )
+        }
     }
 }
 
@@ -1199,7 +1222,8 @@ private fun SkyAppBarBackground(
     sunTimesResolved: Boolean,
     now: ZonedDateTime,
     skyBodySize: SkyBodySize,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sunAltitudeDeg: Double? = null
 ) {
     val skyFacingMode = SkyFacingMode.SOUTH_FACING
     val hasSunTimes = sunTimesResolved && sunrise != null && sunset != null
@@ -1260,10 +1284,10 @@ private fun SkyAppBarBackground(
                 skyFacingMode = skyFacingMode
             )
         }
-        val sunAltitudeDeg = coordinateUsed?.let {
+        val resolvedSunAltitude = sunAltitudeDeg ?: coordinateUsed?.let {
             SunTimesCalculator.sunAltAz(now, it.latitude, it.longitude).altitudeDeg
         }
-        val skyBackground = SkyBackgroundModel.compute(sunAltitudeDeg, hasSunTimes)
+        val skyBackground = SkyBackgroundModel.compute(resolvedSunAltitude, hasSunTimes)
         val gradientStops = if (hasSunTimes) {
             skyBackground.gradientStops.map { stop -> stop.position to Color(stop.color) }.toTypedArray()
         } else {

@@ -3,14 +3,13 @@ package com.bfalls.suntimealerts.tools.skybanner
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import com.bfalls.suntimealerts.alarm.domain.service.MoonArcPositionCalculator
-import com.bfalls.suntimealerts.alarm.domain.service.MoonEphemeris
 import com.bfalls.suntimealerts.alarm.domain.service.MoonPhaseMask
-import com.bfalls.suntimealerts.alarm.domain.service.MoonTimesCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SkyInfoCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SkyInfoMetrics
 import com.bfalls.suntimealerts.alarm.domain.service.SkyBackgroundModel
 import com.bfalls.suntimealerts.alarm.domain.service.SkyBackgroundSpec
 import com.bfalls.suntimealerts.alarm.domain.service.SunArcPositionCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunXY
-import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
@@ -35,7 +34,6 @@ import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.Date
@@ -62,16 +60,17 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-private data class PreviewState(
+internal data class PreviewState(
     val now: ZonedDateTime,
     val coordinate: Coordinate,
     val skyFacingMode: SkyFacingMode = SkyFacingMode.SOUTH_FACING,
     val softMoonEdgeEnabled: Boolean = true,
     val moonBrightnessAdjustment: Float = 0f,
-    val visualTuning: VisualTuning = VisualTuning()
+    val visualTuning: VisualTuning = VisualTuning(),
+    val infoIconCircleEnabled: Boolean = true
 )
 
-private data class VisualTuning(
+internal data class VisualTuning(
     val cloudPatches: Float = 0.18f,
     val horizonHaze: Float = 0.75f,
     val hillShadow: Float = 0.25f,
@@ -94,6 +93,8 @@ private class SkyBannerLabFrame : JFrame("Suntime Alerts Sky Banner Lab") {
     private val latitudeField = JTextField("39.7392", 10)
     private val longitudeField = JTextField("-104.9903", 10)
     private val softMoonEdgeCheckbox = JCheckBox("Soft moon phase edge", true)
+    private val infoIconCircleCheckbox = JCheckBox("Category icon circles", true)
+    private val advanceTimeCheckbox = JCheckBox("Advance preview time", false)
     private var moonBrightnessAdjustment = 0f
     private val moonBrightnessLabel = JLabel()
     private val cloudPatchesSlider = JSlider(0, 100, 18)
@@ -117,6 +118,15 @@ private class SkyBannerLabFrame : JFrame("Suntime Alerts Sky Banner Lab") {
         pack()
         setLocationRelativeTo(null)
         refreshPreview()
+        var lastClockTick = System.nanoTime()
+        Timer(1000) {
+            val tick = System.nanoTime()
+            val elapsedMillis = (tick - lastClockTick) / 1_000_000
+            lastClockTick = tick
+            if (advanceTimeCheckbox.isSelected) {
+                dateTimeSpinner.value = Date((dateTimeSpinner.value as Date).time + elapsedMillis)
+            }
+        }.start()
     }
 
     private fun configureDateTimeSpinner() {
@@ -181,13 +191,18 @@ private class SkyBannerLabFrame : JFrame("Suntime Alerts Sky Banner Lab") {
                 addActionListener { refreshPreview() }
             })
         }
-        addRow(12, "Actions", buttonRow)
+        addRow(12, "Info overlay", JPanel().apply {
+            add(infoIconCircleCheckbox)
+            add(advanceTimeCheckbox)
+        })
+        addRow(13, "Actions", buttonRow)
 
         val refreshListener = ActionListener { refreshPreview() }
         latitudeField.addActionListener(refreshListener)
         longitudeField.addActionListener(refreshListener)
         zoneField.addActionListener(refreshListener)
         softMoonEdgeCheckbox.addActionListener(refreshListener)
+        infoIconCircleCheckbox.addActionListener(refreshListener)
         dateTimeSpinner.addChangeListener { refreshPreview() }
         listOf(
             cloudPatchesSlider,
@@ -214,10 +229,11 @@ private class SkyBannerLabFrame : JFrame("Suntime Alerts Sky Banner Lab") {
                 coordinate = coordinate,
                 softMoonEdgeEnabled = softMoonEdgeCheckbox.isSelected,
                 moonBrightnessAdjustment = moonBrightnessAdjustment,
-                visualTuning = currentVisualTuning()
+                visualTuning = currentVisualTuning(),
+                infoIconCircleEnabled = infoIconCircleCheckbox.isSelected
             )
             previewPanel.state = previewState
-            val phase = MoonEphemeris.moonPhase(previewState.now)
+            val phase = requireNotNull(previewPanel.metrics).moonPhase
             statusLabel.text =
                 "Moon illumination ${(phase.illumination01 * 100.0).roundToInt()}% | " +
                     if (phase.isWaxing) "Waxing" else "Waning"
@@ -344,22 +360,51 @@ private class SkyBannerLabFrame : JFrame("Suntime Alerts Sky Banner Lab") {
     }
 }
 
-private class SkyBannerPanel : JPanel() {
+internal class SkyBannerPanel : JPanel() {
+    private val infoCalculator = SkyInfoCalculator()
+    private val infoOverlay = SkyInfoLabOverlay()
+    internal var metrics: SkyInfoMetrics? = null
+        private set
+    var onOpenAdvancedInfo: ((SkyInfoMetrics) -> Unit)? = null
     var state: PreviewState? = null
         set(value) {
             field = value
+            metrics = value?.let { infoCalculator.calculate(it.now, it.coordinate) }
+            metrics?.let { infoOverlay.update(it, System.nanoTime() / 1_000_000) }
+            getAccessibleContext().accessibleDescription = metrics?.let {
+                com.bfalls.suntimealerts.alarm.presentation.ui.SkyInfoMessages.forMetrics(it).joinToString(". ") { message -> message.text }
+            }
             repaint()
         }
 
     private val sunImage = loadImage("/sun.png")
     private val moonImage = loadImage("/moon_full.png")
-    private val sunTimesCalculator = SunTimesCalculator()
+    private var lastOverlayFrame: SkyInfoFadeFrame? = null
+    private val overlayTimer = Timer(16) {
+        if (isShowing) {
+            val frame = infoOverlay.frame(System.nanoTime() / 1_000_000)
+            if (frame != lastOverlayFrame) {
+                lastOverlayFrame = frame
+                repaint()
+            }
+        }
+    }
 
     init {
         preferredSize = Dimension(860, 220)
         background = Color(0xE8EEF7)
         border = BorderFactory.createEmptyBorder(12, 12, 12, 12)
+        addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(event: MouseEvent) {
+                if (SwingUtilities.isLeftMouseButton(event) && event.y >= height - 48) {
+                    metrics?.let { onOpenAdvancedInfo?.invoke(it) }
+                }
+            }
+        })
     }
+
+    override fun addNotify() { super.addNotify(); overlayTimer.start() }
+    override fun removeNotify() { overlayTimer.stop(); super.removeNotify() }
 
     override fun paintComponent(graphics: Graphics) {
         super.paintComponent(graphics)
@@ -376,18 +421,10 @@ private class SkyBannerPanel : JPanel() {
 
         val width = width.toFloat()
         val height = height.toFloat()
-        val date = LocalDate.of(
-            previewState.now.year,
-            previewState.now.month,
-            previewState.now.dayOfMonth
-        )
-        val sunTimes = sunTimesCalculator.calculateSunTimes(date, previewState.coordinate, previewState.now.zone)
-        val moonWindow = MoonTimesCalculator.computeWindow(
-            previewState.now,
-            previewState.coordinate.latitude,
-            previewState.coordinate.longitude
-        )
-        val moonPhase = MoonEphemeris.moonPhase(previewState.now)
+        val infoMetrics = requireNotNull(metrics)
+        val sunTimes = infoMetrics.today
+        val moonWindow = infoMetrics.moonWindow
+        val moonPhase = infoMetrics.moonPhase
 
         val dayLengthMinutes = if (sunTimes.sunrise != null && sunTimes.sunset != null) {
             Duration.between(sunTimes.sunrise, sunTimes.sunset).toMinutes()
@@ -417,11 +454,7 @@ private class SkyBannerPanel : JPanel() {
             skyFacingMode = previewState.skyFacingMode
         )
         val hasSunTimes = sunTimes.sunrise != null && sunTimes.sunset != null
-        val sunAltitudeDeg = SunTimesCalculator.sunAltAz(
-            previewState.now,
-            previewState.coordinate.latitude,
-            previewState.coordinate.longitude
-        ).altitudeDeg
+        val sunAltitudeDeg = infoMetrics.sunPosition.altitudeDeg
         val skyBackground = SkyBackgroundModel.compute(sunAltitudeDeg, hasSunTimes)
         val isDay = hasSunTimes && sunPosition.isDay
 
@@ -459,17 +492,8 @@ private class SkyBannerPanel : JPanel() {
                 illumination01 = moonPhase.illumination01.toFloat(),
                 isWaxing = moonPhase.isWaxing,
                 litDirectionRadians = MoonPhaseMask.litDirectionRadians(
-                    sunAltAz = SunTimesCalculator.sunAltAz(
-                        previewState.now,
-                        previewState.coordinate.latitude,
-                        previewState.coordinate.longitude
-                    ),
-                    moonAltAz = MoonEphemeris.moonAltAz(
-                        previewState.now,
-                        previewState.coordinate.latitude,
-                        previewState.coordinate.longitude
-                    ),
-                    skyFacingMode = previewState.skyFacingMode
+                    sunAltAz = infoMetrics.sunPosition,
+                    moonAltAz = infoMetrics.moonPosition
                 ),
                 softEdgeEnabled = previewState.softMoonEdgeEnabled,
                 brightnessAdjustment = previewState.moonBrightnessAdjustment,
@@ -502,6 +526,7 @@ private class SkyBannerPanel : JPanel() {
             16,
             42
         )
+        infoOverlay.paint(g, this.width, this.height, previewState.infoIconCircleEnabled, System.nanoTime() / 1_000_000)
         g.dispose()
     }
 

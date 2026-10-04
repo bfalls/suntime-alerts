@@ -1,6 +1,5 @@
 package com.bfalls.suntimealerts.alarm.domain.service
 
-import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -76,26 +75,30 @@ object MoonPhaseMask {
         return outerLimb + terminator
     }
 
+    /**
+     * Bright-limb direction in an upright view centered on the Moon (x right, y down).
+     * The banner's facing mode places bodies on its schematic arc; it does not rotate
+     * the lunar disk. Using fixed east/up screen axes here would foreshorten the
+     * lighting direction, particularly for a Moon near the east or west horizon.
+     */
     fun litDirectionRadians(
         sunAltAz: AltAz,
-        moonAltAz: AltAz,
-        skyFacingMode: SkyFacingMode
+        moonAltAz: AltAz
     ): Float? {
         val sunVector = horizonUnitVector(sunAltAz)
-        val moonVector = horizonUnitVector(moonAltAz)
-        val dot = sunVector.east * moonVector.east +
-            sunVector.north * moonVector.north +
-            sunVector.up * moonVector.up
-        val tangent = HorizonVector(
-            east = sunVector.east - dot * moonVector.east,
-            north = sunVector.north - dot * moonVector.north,
-            up = sunVector.up - dot * moonVector.up
+        val altitude = Math.toRadians(moonAltAz.altitudeDeg)
+        val azimuth = Math.toRadians(moonAltAz.azimuthDeg)
+        // Orthonormal tangent basis: increasing azimuth is screen-right, increasing
+        // altitude is screen-up. Both are perpendicular to the Moon's sight line,
+        // so their dot products already remove the Sun's radial component.
+        val right = HorizonVector(cos(azimuth), -sin(azimuth), 0.0)
+        val up = HorizonVector(
+            -sin(altitude) * sin(azimuth),
+            -sin(altitude) * cos(azimuth),
+            cos(altitude)
         )
-        val screenX = when (skyFacingMode) {
-            SkyFacingMode.SOUTH_FACING -> -tangent.east
-            SkyFacingMode.NORTH_FACING -> tangent.east
-        }
-        val screenY = -tangent.up
+        val screenX = sunVector.dot(right)
+        val screenY = -sunVector.dot(up)
         if (abs(screenX) < 0.000001 && abs(screenY) < 0.000001) return null
         return atan2(screenY, screenX).toFloat()
     }
@@ -115,5 +118,8 @@ object MoonPhaseMask {
         val east: Double,
         val north: Double,
         val up: Double
-    )
+    ) {
+        fun dot(other: HorizonVector): Double =
+            east * other.east + north * other.north + up * other.up
+    }
 }

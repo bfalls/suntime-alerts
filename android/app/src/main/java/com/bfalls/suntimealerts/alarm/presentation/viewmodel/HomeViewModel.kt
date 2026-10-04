@@ -7,7 +7,6 @@ import com.bfalls.suntimealerts.alarm.data.SettingsRepository
 import com.bfalls.suntimealerts.alarm.data.SunScheduler
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.LocationMode
-import com.bfalls.suntimealerts.alarm.domain.model.SkyFacingMode
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
 import com.bfalls.suntimealerts.alarm.domain.model.SkyBodySize
@@ -16,7 +15,8 @@ import com.bfalls.suntimealerts.alarm.services.AlarmReadiness
 import com.bfalls.suntimealerts.alarm.services.AlarmReadinessProvider
 import com.bfalls.suntimealerts.alarm.domain.service.MoonEphemeris
 import com.bfalls.suntimealerts.alarm.domain.service.MoonPhaseMask
-import com.bfalls.suntimealerts.alarm.domain.service.MoonTimesCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SkyInfoCalculator
+import com.bfalls.suntimealerts.alarm.domain.service.SkyInfoMetrics
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator
 import com.bfalls.suntimealerts.alarm.domain.service.SunTimesCalculator.SunTimes
 import kotlinx.coroutines.flow.update
@@ -37,6 +37,8 @@ class HomeViewModel(
     private val sunTimesCalculator: SunTimesCalculator,
     private val alarmReadinessProvider: AlarmReadinessProvider
 ) : ViewModel() {
+
+    private val skyInfoCalculator = SkyInfoCalculator(sunTimesCalculator)
 
     private val fallbackSunTimes = sunTimesCalculator.calculateSunTimes(
         LocalDate.now(ZoneId.systemDefault()),
@@ -61,6 +63,7 @@ class HomeViewModel(
         val moonIsWaxing: Boolean = true,
         val moonLitDirectionRadians: Float? = null,
         val now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault()),
+        val skyInfoMetrics: SkyInfoMetrics? = null,
         val skyBodySize: SkyBodySize = SkyBodySize.SMALL,
         val alarmReadiness: AlarmReadiness? = null,
         val error: String? = null
@@ -168,6 +171,13 @@ class HomeViewModel(
         }
     }
 
+    /** Minute ticks reuse the selected location and cached daily calculations. */
+    fun updateClock(now: ZonedDateTime = ZonedDateTime.now(ZoneId.systemDefault())) {
+        val coordinate = _state.value.coordinateUsed ?: return
+        val metrics = skyInfoCalculator.calculate(now, coordinate)
+        _state.update { it.withLiveAstronomy(metrics) }
+    }
+
     private suspend fun loadState() {
         try {
             val settings = settingsStore.load()
@@ -238,21 +248,18 @@ class HomeViewModel(
         val resolvedSettings = settings ?: cachedSettings ?: settingsStore.load().also { cachedSettings = it }
         val zoneId = ZoneId.systemDefault()
         val coordinate = resolveCoordinate(resolvedSettings)
-        val sunTimes = coordinate?.let {
-            sunTimesCalculator.calculateSunTimes(LocalDate.now(zoneId), it, zoneId)
-        } ?: placeholderSunTimes
         val now = ZonedDateTime.now(zoneId)
-        val moonWindow = coordinate?.let {
-            MoonTimesCalculator.computeWindow(now, it.latitude, it.longitude)
-        }
-        val moonPhase = MoonEphemeris.moonPhase(now)
+        val metrics = coordinate?.let { skyInfoCalculator.calculate(now, it) }
+        val sunTimes = metrics?.today?.let { SunTimes(it.sunrise, it.sunset) } ?: placeholderSunTimes
+        val moonWindow = metrics?.moonWindow
+        val moonPhase = metrics?.moonPhase ?: MoonEphemeris.moonPhase(now)
         val moonLitDirectionRadians = coordinate?.let {
-            val sunAltAz = SunTimesCalculator.sunAltAz(now, it.latitude, it.longitude)
-            val moonAltAz = MoonEphemeris.moonAltAz(now, it.latitude, it.longitude)
-            MoonPhaseMask.litDirectionRadians(sunAltAz, moonAltAz, SkyFacingMode.SOUTH_FACING)
+            val sunAltAz = requireNotNull(metrics).sunPosition
+            val moonAltAz = metrics.moonPosition
+            MoonPhaseMask.litDirectionRadians(sunAltAz, moonAltAz)
         }
-        val sunriseTime = sunTimes?.sunrise ?: _state.value.sunriseTime ?: fallbackSunTimes.sunrise
-        val sunsetTime = sunTimes?.sunset ?: _state.value.sunsetTime ?: fallbackSunTimes.sunset
+        val sunriseTime = if (metrics != null) metrics.today.sunrise else sunTimes?.sunrise ?: _state.value.sunriseTime ?: fallbackSunTimes.sunrise
+        val sunsetTime = if (metrics != null) metrics.today.sunset else sunTimes?.sunset ?: _state.value.sunsetTime ?: fallbackSunTimes.sunset
         val sunriseAlarms = alarms?.filter { it.type == SunEventType.SUNRISE }?.sortedBy { it.offsetMinutes }
             ?: _state.value.sunriseAlarms
         val sunsetAlarms = alarms?.filter { it.type == SunEventType.SUNSET }?.sortedBy { it.offsetMinutes }
@@ -275,6 +282,7 @@ class HomeViewModel(
                 moonLitDirectionRadians = moonLitDirectionRadians,
                 skyBodySize = resolvedSettings.skyBodySize,
                 now = now,
+                skyInfoMetrics = metrics,
                 error = if (coordinate == null) "Location unavailable" else null
             )
         }
@@ -297,6 +305,21 @@ class HomeViewModel(
         val coordinate = resolveCoordinate(settings) ?: Coordinate(0.0, 0.0)
         scheduleService.schedule(coordinate, ZoneId.systemDefault())
     }
+
+    private fun State.withLiveAstronomy(metrics: SkyInfoMetrics): State = copy(
+        now = metrics.now,
+        skyInfoMetrics = metrics,
+        sunriseTime = metrics.today.sunrise,
+        sunsetTime = metrics.today.sunset,
+        sunriseTimeText = formatTime(metrics.today.sunrise, cachedSettings?.timeFormat24h ?: true),
+        sunsetTimeText = formatTime(metrics.today.sunset, cachedSettings?.timeFormat24h ?: true),
+        moonRiseTime = metrics.moonWindow.rise,
+        moonSetTime = metrics.moonWindow.set,
+        moonMaxAltDeg = metrics.moonWindow.maxAltDeg,
+        moonIllumination01 = metrics.moonPhase.illumination01,
+        moonIsWaxing = metrics.moonPhase.isWaxing,
+        moonLitDirectionRadians = MoonPhaseMask.litDirectionRadians(metrics.sunPosition, metrics.moonPosition)
+    )
 
     private suspend fun refreshReadiness(): AlarmReadiness {
         val readiness = alarmReadinessProvider.readiness()

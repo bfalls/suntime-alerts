@@ -13,7 +13,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.bfalls.suntimealerts.alarm.domain.model.Coordinate
 import com.bfalls.suntimealerts.alarm.domain.model.SunAlarm
 import com.bfalls.suntimealerts.alarm.domain.model.SunEventType
-import com.bfalls.suntimealerts.alarm.domain.model.formatOffset
 import com.bfalls.suntimealerts.alarm.presentation.viewmodel.HomeViewModel
 import com.bfalls.suntimealerts.ui.theme.SuntimeAlertsTheme
 import com.bfalls.suntimealerts.alarm.presentation.ui.MoonVisibleKey
@@ -82,8 +81,8 @@ class HomeScreenAppBarTest {
         composeTestRule.onNodeWithTag("sky_appbar_background").assertExists()
         composeTestRule.onNodeWithText("Sunrise", substring = true).assertExists()
         composeTestRule.onNodeWithText("Sunset", substring = true).assertExists()
-        composeTestRule.onNodeWithText(formatOffset(30)).assertExists()
-        composeTestRule.onNodeWithText(formatOffset(-15)).assertExists()
+        composeTestRule.onNodeWithText("30m after sunrise").assertExists()
+        composeTestRule.onNodeWithText("15m before sunset").assertExists()
     }
 
     @Test
@@ -127,7 +126,7 @@ class HomeScreenAppBarTest {
         composeTestRule.onNodeWithText("After").assertExists()
         composeTestRule.onNodeWithText("Hours").assertExists()
         composeTestRule.onNodeWithText("Minutes").assertExists()
-        composeTestRule.onNodeWithContentDescription("Cancel").performClick()
+        composeTestRule.onNodeWithText("Cancel").performClick()
 
         composeTestRule.onNodeWithText("Label").assertDoesNotExistCompat()
     }

@@ -14,7 +14,8 @@ sourceSets {
         java.include(
             "com/bfalls/suntimealerts/tools/skybanner/**",
             "com/bfalls/suntimealerts/alarm/domain/model/**",
-            "com/bfalls/suntimealerts/alarm/domain/service/**"
+            "com/bfalls/suntimealerts/alarm/domain/service/**",
+            "com/bfalls/suntimealerts/alarm/presentation/ui/SkyInfoMessages.kt"
         )
         resources.srcDirs(
             "src/main/resources",
